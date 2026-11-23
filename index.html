@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Şiirlerim Sana</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Şiirler">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1d1620">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: tek sütun, üstte son şiir büyük kart, altında arşiv listesi. Yönetici sekmesi sadece yazan kişide. */
+:root{
+  --bg:#f6eff0; --surface:#fffafa; --ink:#2a1d27; --muted:#7d6b76;
+  --rose:#b8445f; --rose-ink:#ffffff; --line:#e6d6da; --ok:#2f7d5b;
+  --display:'Cormorant Garamond',Georgia,serif;
+  --body:'Inter',system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1d1620; --surface:#2a2030; --ink:#f3e8ec; --muted:#a8939f;
+  --rose:#e07a93; --rose-ink:#2a1020; --line:#3d2f44; --ok:#6fc29a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1d1620; --surface:#2a2030; --ink:#f3e8ec; --muted:#a8939f;
+  --rose:#e07a93; --rose-ink:#2a1020; --line:#3d2f44; --ok:#6fc29a; color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));min-height:100vh}
+main{max-width:560px;margin:0 auto;padding-block:28px 48px;display:flex;flex-direction:column;gap:22px}
+h1,h2{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance}
+h1{font-size:2.1rem;line-height:1.1}
+.muted{color:var(--muted);font-size:.9rem}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--rose);outline-offset:2px}
+.btn{background:var(--rose);color:var(--rose-ink);border:0;border-radius:10px;padding:12px 18px;font-weight:600;min-height:44px}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.55}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:.85rem;color:var(--muted)}
+input[type=text],input[type=password],textarea{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;width:100%}
+textarea{min-height:200px;resize:vertical;font-family:var(--display);font-size:1.2rem;line-height:1.5}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.tabs{display:flex;gap:6px}
+.tabs button{background:transparent;border:1px solid var(--line);border-radius:999px;padding:8px 16px;color:var(--muted)}
+.tabs button[aria-selected=true]{background:var(--rose);color:var(--rose-ink);border-color:var(--rose)}
+.poem{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:26px 22px;min-width:0}
+.poem h2{font-size:1.7rem;margin-bottom:10px}
+.poem .text{font-family:var(--display);font-size:1.35rem;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.poem .date{margin-top:16px;font-size:.8rem;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.poem.latest{border-color:var(--rose)}
+.archive{display:flex;flex-direction:column;gap:10px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:12px;text-align:left;padding:14px 16px;display:flex;justify-content:space-between;gap:12px;width:100%;min-width:0}
+.item span:first-child{font-family:var(--display);font-size:1.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item span:last-child{color:var(--muted);font-size:.8rem;flex:none;align-self:center}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.check{display:flex;gap:10px;align-items:center}
+.check input{width:20px;height:20px;accent-color:var(--rose)}
+.notice{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:14px 16px}
+.status{min-height:1.4em;font-size:.9rem;color:var(--ok)}
+.status.err{color:var(--rose)}
+.panel{display:flex;flex-direction:column;gap:16px}
+hr{border:0;border-top:1px solid var(--line);width:100%;margin:6px 0}
+.del{background:transparent;border:0;color:var(--muted);text-decoration:underline;padding:6px;font-size:.8rem}
+@media (prefers-reduced-motion:no-preference){.poem{animation:in .5s ease}@keyframes in{from{opacity:.0;transform:translateY(6px)}}}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+const API = 'https://okgnefzgvkzbzrzizoqv.supabase.co/functions/v1/poem-api';
+const $ = (s, r = document) => r.querySelector(s);
+const el = (t, a = {}, ...kids) => { const n = document.createElement(t);
+  for (const [k, v] of Object.entries(a)) { if (k === 'class') n.className = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v); }
+  kids.flat().forEach(c => n.append(c && c.nodeType ? c : document.createTextNode(c ?? ''))); return n; };
+const store = { get: k => { try { return localStorage.getItem(k) } catch (e) { return null } },
+                set: (k, v) => { try { localStorage.setItem(k, v) } catch (e) {} },
+                del: k => { try { localStorage.removeItem(k) } catch (e) {} } };
+let code = store.get('code'), role = null, vapid = null, poems = [], tab = 'read';
+
+const hashCode = (location.hash.match(/k=([\w-]+)/) || [])[1];
+if (hashCode) { code = hashCode; store.set('code', code); history.replaceState(null, '', location.pathname); }
+
+async function api(action, extra = {}) {
+  const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, code, ...extra }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error || 'hata'), { status: r.status });
+  return j;
+}
+const fmt = d => new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+const app = $('#app');
+
+function gate(msg) {
+  app.replaceChildren(
+    el('h1', {}, 'Şiirlerim Sana'),
+    el('p', { class: 'muted' }, 'Sana verilen kodu bir kez gir, sonra bir daha sorulmaz.'),
+    el('div', { class: 'field' }, el('label', { for: 'code' }, 'Kod'), el('input', { id: 'code', type: 'password', autocomplete: 'off', autocapitalize: 'off' })),
+    el('button', { class: 'btn', onclick: async () => { code = $('#code').value.trim(); store.set('code', code); await boot(); } }, 'Gir'),
+    el('div', { class: 'status err' }, msg || '')
+  );
+}
+
+async function boot() {
+  if (!code) return gate();
+  try {
+    const c = await api('config'); role = c.role; vapid = c.vapid_public;
+    poems = (await api('list')).poems;
+  } catch (e) {
+    if (e.status === 401) { store.del('code'); code = null; return gate('Kod yanlış, tekrar dene.'); }
+    app.replaceChildren(el('p', {}, 'Bağlanılamadı. İnternetini kontrol edip uygulamayı yeniden aç.'), el('button', { class: 'btn', onclick: boot }, 'Tekrar dene'));
+    return;
+  }
+  render();
+}
+
+function render() {
+  const top = el('div', { class: 'top' }, el('h1', {}, 'Şiirlerim Sana'));
+  if (role === 'admin') {
+    top.append(el('div', { class: 'tabs', role: 'tablist' },
+      el('button', { role: 'tab', 'aria-selected': tab === 'read', onclick: () => { tab = 'read'; render(); } }, 'Oku'),
+      el('button', { role: 'tab', 'aria-selected': tab === 'write', onclick: () => { tab = 'write'; render(); } }, 'Yaz')));
+  }
+  app.replaceChildren(top, tab === 'write' && role === 'admin' ? writeView() : readView());
+}
+
+function poemCard(p, latest) {
+  return el('article', { class: 'poem' + (latest ? ' latest' : '') },
+    p.title ? el('h2', {}, p.title) : '', el('div', { class: 'text' }, p.body), el('div', { class: 'date' }, fmt(p.created_at)));
+}
+
+function readView() {
+  const box = el('div', { class: 'panel' });
+  if (role === 'reader') box.append(notifBox());
+  if (!poems.length) { box.append(el('p', { class: 'muted' }, 'Henüz şiir yok. İlk şiir gelince burada görünecek.')); return box; }
+  box.append(poemCard(poems[0], true));
+  if (poems.length > 1) {
+    box.append(el('h2', {}, 'Önceki şiirler'));
+    const list = el('div', { class: 'archive' });
+    poems.slice(1).forEach(p => {
+      const open = el('div');
+      const b = el('button', { class: 'item', onclick: () => { open.replaceChildren(open.firstChild ? '' : poemCard(p)); } },
+        el('span', {}, p.title || p.body.split('\n')[0]), el('span', {}, fmt(p.created_at)));
+      list.append(el('div', {}, b, open));
+    });
+    box.append(list);
+  }
+  return box;
+}
+
+function notifBox() {
+  const box = el('div', { class: 'notice' });
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window;
+  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (!supported || (ios && !standalone)) {
+    box.append(el('strong', {}, 'Bildirim almak için'), el('p', { class: 'muted' }, 'Safari’de paylaş düğmesine dokun, “Ana Ekrana Ekle”yi seç, sonra uygulamayı ana ekrandan aç.'));
+    return box;
+  }
+  const status = el('div', { class: 'status' });
+  const btn = el('button', { class: 'btn' }, 'Bildirimleri aç');
+  btn.onclick = async () => {
+    btn.disabled = true; status.className = 'status'; status.textContent = '';
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') throw new Error('İzin verilmedi. Ayarlar > Bildirimler bölümünden açabilirsin.');
+      const reg = await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(vapid) });
+      await api('subscribe', { subscription: sub.toJSON() });
+      store.set('sub', '1'); status.textContent = 'Bildirimler açık.'; btn.hidden = true;
+    } catch (e) { status.className = 'status err'; status.textContent = e.message; btn.disabled = false; }
+  };
+  box.append(el('strong', {}, 'Yeni şiir gelince haber vereyim mi?'), el('div', { class: 'row', style: 'margin-top:10px' }, btn), status);
+  if (store.get('sub') && Notification.permission === 'granted') { btn.hidden = true; status.textContent = 'Bildirimler açık.'; navigator.serviceWorker.register('sw.js'); }
+  return box;
+}
+function b64(s) { const p = '='.repeat((4 - s.length % 4) % 4); const r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); }
+
+function writeView() {
+  const st = el('div', { class: 'status', role: 'status' });
+  const show = (m, err) => { st.className = 'status' + (err ? ' err' : ''); st.textContent = m; };
+  const title = el('input', { id: 'title', type: 'text', placeholder: 'Başlık (isteğe bağlı)' });
+  const body = el('textarea', { id: 'body', placeholder: 'Şiirini buraya yaz…' });
+  const notify = el('input', { id: 'notify', type: 'checkbox', checked: '' });
+  const pub = el('button', { class: 'btn' }, 'Yayınla');
+  pub.onclick = async () => {
+    pub.disabled = true;
+    try {
+      const r = await api('add', { title: title.value, body: body.value, notify: notify.checked });
+      poems = (await api('list')).poems; title.value = ''; body.value = '';
+      show(r.push ? `Yayınlandı. Bildirim gönderildi: ${r.push.sent}, başarısız: ${r.push.failed}.` : 'Yayınlandı.');
+    } catch (e) { show(e.message, true); }
+    pub.disabled = false;
+  };
+  const mt = el('input', { id: 'mt', type: 'text', placeholder: 'Başlık', value: '💌' });
+  const mm = el('input', { id: 'mm', type: 'text', placeholder: 'Mesaj' });
+  const ms = el('div', { class: 'status', role: 'status' });
+  const send = el('button', { class: 'btn ghost' }, 'Bildirim gönder');
+  send.onclick = async () => {
+    send.disabled = true; ms.className = 'status';
+    try { const r = await api('notify', { title: mt.value, message: mm.value }); ms.textContent = `Gönderildi: ${r.push.sent}, başarısız: ${r.push.failed}.`; mm.value = ''; }
+    catch (e) { ms.className = 'status err'; ms.textContent = e.message; }
+    send.disabled = false;
+  };
+  const manage = el('div', { class: 'archive' });
+  poems.forEach(p => manage.append(el('div', { class: 'item' }, el('span', {}, p.title || p.body.split('\n')[0]),
+    el('button', { class: 'del', onclick: async () => { if (!p._c) { p._c = 1; render(); return; } await api('delete', { id: p.id }); poems = (await api('list')).poems; render(); } }, p._c ? 'Emin misin? Sil' : 'Sil'))));
+  return el('div', { class: 'panel' },
+    el('div', { class: 'field' }, el('label', { for: 'title' }, 'Başlık'), title),
+    el('div', { class: 'field' }, el('label', { for: 'body' }, 'Şiir'), body),
+    el('label', { class: 'check' }, notify, 'Yayınlayınca ona bildirim gönder'),
+    pub, st, el('hr'),
+    el('h2', {}, 'Sadece bildirim'),
+    el('div', { class: 'field' }, el('label', { for: 'mt' }, 'Başlık'), mt),
+    el('div', { class: 'field' }, el('label', { for: 'mm' }, 'Mesaj'), mm),
+    send, ms, el('hr'),
+    el('h2', {}, 'Şiirler'), manage);
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+boot();
+</script>
+</body>
+</html>
