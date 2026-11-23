@@ -272,7 +272,7 @@ function readView() {
   const box = el('div', { class: 'panel' });
   if (role === 'reader') box.append(notifBox());
   if (!poems.length) {
-    box.append(el('div', { class: 'empty' }, el('div', { class: 'big' }, 'Şiirlerin burada olacak ♥'),
+    box.append(el('div', { class: 'empty' }, el('div', { class: 'big' }, 'Gönlümden dökülenler'),
       el('div', { class: 'muted' }, 'İlk şiir gelince bildirimle haber vereceğim.'),
       el('button', { class: 'btn ghost', onclick: () => refresh() }, 'Yenile')));
     return box;
