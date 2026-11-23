@@ -69,6 +69,7 @@ textarea.short{min-height:96px;font-family:var(--body);font-size:1rem;line-heigh
 .offline{background:var(--surface);border:1.5px dashed var(--line);border-radius:16px;padding:10px 14px;font-size:.88rem;color:var(--muted)}
 .avatar{width:44px;height:44px;border-radius:50%;border:2px solid #fff;background:var(--lav);color:#fff;font-weight:700;font-size:1.05rem;display:grid;place-items:center;flex:none;position:relative}
 .avatar.b{background:var(--rose)}
+.avatar img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
 .avatar .mm{position:absolute;right:-6px;bottom:-6px;width:24px;height:24px;border-radius:50%;background:#fff;display:grid;place-items:center;font-size:.9rem;box-shadow:0 2px 6px rgba(120,60,90,.3)}
 .moods{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .mood{display:flex;align-items:center;gap:12px;background:var(--surface);border:1.5px solid var(--line);border-radius:22px;padding:10px 12px;min-width:0;text-align:left;min-height:64px}
@@ -202,7 +203,7 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
     const off = document.createElement('canvas'); off.width = W; off.height = H; const o = off.getContext('2d');
     const fs = Math.min(W * 0.52, H * 0.3, 240);
     o.font = `700 ${fs}px Quicksand, system-ui, sans-serif`; o.textAlign = 'center'; o.textBaseline = 'alphabetic';
-    const wE = o.measureText('E').width, wS = o.measureText('Ş').width, gap = fs * 0.14;
+    const wE = o.measureText('E').width, wS = o.measureText('Ş').width, gap = fs * 0.52;
     const total = wE + wS + gap, x0 = W / 2 - total / 2, base = H * 0.42 + fs * 0.36;
     o.fillStyle = '#000'; o.fillText('E', x0 + wE / 2, base); o.fillText('Ş', x0 + wE + gap + wS / 2, base);
     const data = o.getImageData(0, 0, W, H).data;
@@ -212,6 +213,11 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
         const xi = Math.round(x), yi = Math.round(y); if (xi < 0 || yi < 0 || xi >= W || yi >= H) continue;
         if (data[(yi * W + xi) * 4 + 3] > 128) pts.push({ x: x + (Math.random() - .5) * 2, y: y + (Math.random() - .5) * 2 }); }
       if (pts.length <= 260) break; step += 1; }
+    // E ile Ş arasında bir kalp
+    const hcx = x0 + wE + gap / 2, hcy = base - fs * 0.36, hs = fs * 0.14, hstep = Math.max(4, step * 0.7);
+    for (let y = hcy - hs * 1.3; y <= hcy + hs * 1.3; y += hstep) for (let x = hcx - hs * 1.3; x <= hcx + hs * 1.3; x += hstep) {
+      const X = (x - hcx) / hs, Y = -(y - hcy) / hs; const f = Math.pow(X * X + Y * Y - 1, 3) - X * X * Y * Y * Y;
+      if (f <= 0) pts.push({ x, y }); }
     return { pts, size: Math.max(9, step * 1.0) };
   }
 
@@ -310,6 +316,7 @@ const oth = r => r === 'admin' ? 'reader' : 'admin';
 const nameMe = () => (P[role]?.username || '').trim() || (role === 'admin' ? 'Emin' : 'Ben');
 const nameOther = () => (P[role]?.calls_other || '').trim() || (P[oth(role)]?.username || '').trim() || (role === 'admin' ? 'Sevgilim' : 'Emin');
 const nameOf = r => r === role ? nameMe() : nameOther();
+const photoOrInitial = r => { const ph = P[r]?.photo; return ph ? el('img', { src: ph, alt: '' }) : initialOf(r); };
 const initialOf = r => { const u = (P[r]?.username || '').trim(); return (u ? u[0] : (r === 'admin' ? 'E' : 'Ş')).toLocaleUpperCase('tr-TR'); };
 const MOODS = [['🥰', 'Aşığım'], ['😊', 'Mutluyum'], ['🥺', 'Özledim'], ['😴', 'Yorgunum'], ['😌', 'Sakinim'], ['🤩', 'Heyecanlıyım'], ['😢', 'Üzgünüm'], ['😤', 'Sinirliyim'], ['🤒', 'Hastayım']];
 const moodName = e => (MOODS.find(m => m[0] === e) || [])[1] || '';
@@ -403,7 +410,7 @@ function renderChrome() {
 
 /* ---------- Ortak parçalar ---------- */
 function header(title, sub) {
-  const av = el('button', { class: 'avatar' + (role === 'reader' ? ' b' : ''), type: 'button', 'aria-label': 'Profilim', onclick: profileSheet }, initialOf(role));
+  const av = el('button', { class: 'avatar' + (role === 'reader' ? ' b' : ''), type: 'button', 'aria-label': 'Profilim', onclick: profileSheet }, photoOrInitial(role));
   return el('div', { class: 'panel', style: 'gap:10px' }, el('div', { class: 'top' }, el('h1', {}, title), av), sub ? el('p', { class: 'sub' }, sub) : '');
 }
 function polaroid(ph, w, rot, tape, onclick) {
@@ -417,7 +424,7 @@ function moodStrip() {
   const chip = r => {
     const p = P[r] || {}, mine = r === role;
     const sub = p.mood ? `${p.mood} ${p.mood_text || moodName(p.mood)}${p.mood_at ? ' · ' + rel(p.mood_at) : ''}` : (mine ? 'Ruh halini paylaş' : 'Henüz paylaşmadı');
-    const av = el('div', { class: 'avatar' + (r === 'reader' ? ' b' : '') }, initialOf(r), p.mood ? el('span', { class: 'mm' }, p.mood) : '');
+    const av = el('div', { class: 'avatar' + (r === 'reader' ? ' b' : '') }, photoOrInitial(r), p.mood ? el('span', { class: 'mm' }, p.mood) : '');
     const body = [av, el('div', { class: 't' }, el('b', {}, nameOf(r)), el('span', {}, sub))];
     return mine ? el('button', { class: 'mood', type: 'button', onclick: moodSheet, 'aria-label': 'Ruh halimi değiştir' }, body) : el('div', { class: 'mood' }, body);
   };
@@ -488,14 +495,28 @@ function profileSheet() {
   const un = el('input', { id: 'un', type: 'text', maxlength: '30', placeholder: role === 'admin' ? 'Emin' : 'Kullanıcı adın', value: me.username || '' });
   const co = el('input', { id: 'co', type: 'text', maxlength: '30', placeholder: 'Mesela: Pamuğum', value: me.calls_other || '' });
   const st = el('div', { class: 'status err', role: 'status' });
+  let newPhoto = null, removePhoto = false;
+  const preview = el('div', { class: 'avatar' + (role === 'reader' ? ' b' : ''), style: 'width:88px;height:88px;font-size:2.2rem;margin:0 auto' }, me.photo ? el('img', { src: me.photo, alt: '' }) : initialOf(role));
+  const setPreview = src => preview.replaceChildren(src ? el('img', { src, alt: '' }) : initialOf(role));
+  const pfile = el('input', { id: 'pfile', type: 'file', accept: 'image/*', style: 'display:none' });
+  pfile.addEventListener('change', async () => {
+    const f = pfile.files[0]; pfile.value = ''; if (!f) return;
+    try { const sh = await shrink(f); newPhoto = sh.thumb; removePhoto = false; setPreview(newPhoto); st.textContent = ''; }
+    catch (e) { st.className = 'status err'; st.textContent = 'Fotoğraf okunamadı.'; }
+  });
+  const pick = el('button', { class: 'chip', type: 'button', onclick: () => pfile.click() }, 'Fotoğraf seç');
+  const rm = el('button', { class: 'chip', type: 'button', onclick: () => { newPhoto = null; removePhoto = true; setPreview(null); } }, 'Fotoğrafı kaldır');
   let close;
   const save = el('button', { class: 'btn', type: 'button', onclick: async () => {
-    save.disabled = true;
-    try { const r = await api('profile_set', { username: un.value, calls_other: co.value }); P = r.profiles; store.set('profiles', JSON.stringify(P)); close(); render(); }
+    save.disabled = true; st.className = 'status err'; st.textContent = '';
+    const body = { username: un.value, calls_other: co.value };
+    if (newPhoto) body.photo = newPhoto; else if (removePhoto) body.photo = null;
+    try { const r = await api('profile_set', body); P = r.profiles; store.set('profiles', JSON.stringify(P)); close(); render(); }
     catch (e) { st.textContent = e.message; save.disabled = false; }
   } }, 'Kaydet');
   const out = el('button', { class: 'btn ghost', type: 'button', onclick: () => { ['code', 'role', 'sub'].forEach(store.del); location.reload(); } }, 'Çıkış yap');
   close = openSheet('Profilim',
+    el('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:10px' }, preview, el('div', { class: 'row', style: 'justify-content:center' }, pick, rm, pfile)),
     el('div', { class: 'field' }, el('label', { for: 'un' }, 'Kullanıcı adım'), un),
     el('div', { class: 'field' }, el('label', { for: 'co' }, 'Ona taktığım isim'), co),
     ot.calls_other ? el('p', { class: 'muted', style: 'margin:0' }, `${ot.username || 'O'} sana “${ot.calls_other}” diye sesleniyor ♥`) : '',
