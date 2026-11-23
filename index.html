@@ -69,6 +69,27 @@ textarea{min-height:200px;resize:vertical;font-family:var(--display);font-size:1
 .panel{display:flex;flex-direction:column;gap:16px}
 hr{border:0;border-top:1px solid var(--line);width:100%;margin:6px 0}
 .del{background:transparent;border:0;color:var(--muted);text-decoration:underline;padding:6px;font-size:.8rem}
+
+html[data-size="s"]{--poem-size:1.15rem}
+html[data-size="m"]{--poem-size:1.35rem}
+html[data-size="l"]{--poem-size:1.6rem}
+.poem .text{font-size:var(--poem-size,1.35rem)}
+.badge{display:inline-block;background:var(--rose);color:var(--rose-ink);font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:2px 9px;vertical-align:middle;margin-left:8px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{background:transparent;border:1px solid var(--line);border-radius:999px;padding:8px 14px;color:var(--muted);min-height:40px;font-size:.9rem}
+.chip[aria-pressed=true]{background:var(--rose);border-color:var(--rose);color:var(--rose-ink)}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:.9rem;min-width:0}
+.stat b{font-variant-numeric:tabular-nums}
+.offline{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:8px 12px;font-size:.85rem;color:var(--muted)}
+.heart{color:var(--rose)}
+.count{font-size:.8rem;color:var(--muted);text-align:right}
+.preview{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:.9rem}
+.preview b{display:block}
+.itemrow{display:flex;align-items:center;gap:8px}
+.itemrow .item{flex:1}
+.itemrow .item span:last-child{display:none}
+.mini{background:transparent;border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--muted);font-size:.8rem;min-height:40px}
 @media (prefers-reduced-motion:no-preference){.poem{animation:in .5s ease}@keyframes in{from{opacity:.0;transform:translateY(6px)}}}
 </style>
 </head>
@@ -78,12 +99,16 @@ hr{border:0;border-top:1px solid var(--line);width:100%;margin:6px 0}
 const API = 'https://okgnefzgvkzbzrzizoqv.supabase.co/functions/v1/poem-api';
 const $ = (s, r = document) => r.querySelector(s);
 const el = (t, a = {}, ...kids) => { const n = document.createElement(t);
-  for (const [k, v] of Object.entries(a)) { if (k === 'class') n.className = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v); }
+  for (const [k, v] of Object.entries(a)) { if (v === false || v == null) continue; if (k === 'class') n.className = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v === true ? '' : v); }
   kids.flat().forEach(c => n.append(c && c.nodeType ? c : document.createTextNode(c ?? ''))); return n; };
 const store = { get: k => { try { return localStorage.getItem(k) } catch (e) { return null } },
                 set: (k, v) => { try { localStorage.setItem(k, v) } catch (e) {} },
                 del: k => { try { localStorage.removeItem(k) } catch (e) {} } };
-let code = store.get('code'), role = null, vapid = null, poems = [], tab = 'read';
+const jget = (k, d) => { try { return JSON.parse(store.get(k)) ?? d } catch (e) { return d } };
+
+let code = store.get('code'), role = null, vapid = null, poems = jget('poems', []), tab = 'read', offline = false;
+let editing = null, stats = null, seen = new Set(jget('seen', []));
+document.documentElement.dataset.size = store.get('size') || 'm';
 
 const hashCode = (location.hash.match(/k=([\w-]+)/) || [])[1];
 if (hashCode) { code = hashCode; store.set('code', code); history.replaceState(null, '', location.pathname); }
@@ -96,74 +121,147 @@ async function api(action, extra = {}) {
 }
 const fmt = d => new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
 const app = $('#app');
+const firstLine = p => p.title || p.body.split('\n')[0];
 
 function gate(msg) {
+  const input = el('input', { id: 'code', type: 'password', autocomplete: 'off', autocapitalize: 'off', inputmode: 'text' });
+  const go = async () => { code = input.value.trim(); if (!code) return; store.set('code', code); await boot(); };
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
   app.replaceChildren(
     el('h1', {}, 'Şiirlerim Sana'),
     el('p', { class: 'muted' }, 'Sana verilen kodu bir kez gir, sonra bir daha sorulmaz.'),
-    el('div', { class: 'field' }, el('label', { for: 'code' }, 'Kod'), el('input', { id: 'code', type: 'password', autocomplete: 'off', autocapitalize: 'off' })),
-    el('button', { class: 'btn', onclick: async () => { code = $('#code').value.trim(); store.set('code', code); await boot(); } }, 'Gir'),
-    el('div', { class: 'status err' }, msg || '')
+    el('div', { class: 'field' }, el('label', { for: 'code' }, 'Kod'), input),
+    el('button', { class: 'btn', onclick: go }, 'Gir'),
+    el('div', { class: 'status err', role: 'status' }, msg || '')
   );
+}
+
+async function refresh(silent) {
+  try {
+    poems = (await api('list')).poems; offline = false;
+    store.set('poems', JSON.stringify(poems));
+    if (role === 'admin') { try { stats = await api('stats'); } catch (e) {} }
+  } catch (e) {
+    if (e.status === 401) throw e;
+    offline = true;
+  }
+  if (!silent) render();
 }
 
 async function boot() {
   if (!code) return gate();
   try {
-    const c = await api('config'); role = c.role; vapid = c.vapid_public;
-    poems = (await api('list')).poems;
+    const c = await api('config'); role = c.role; vapid = c.vapid_public; store.set('role', role);
+    await refresh(true);
   } catch (e) {
     if (e.status === 401) { store.del('code'); code = null; return gate('Kod yanlış, tekrar dene.'); }
-    app.replaceChildren(el('p', {}, 'Bağlanılamadı. İnternetini kontrol edip uygulamayı yeniden aç.'), el('button', { class: 'btn', onclick: boot }, 'Tekrar dene'));
-    return;
+    role = store.get('role'); offline = true;
+    if (!role || !poems.length) {
+      app.replaceChildren(el('p', {}, 'Bağlanılamadı. İnternetini kontrol edip tekrar dene.'), el('button', { class: 'btn', onclick: boot }, 'Tekrar dene'));
+      return;
+    }
   }
-  render();
+  render(); resync();
+}
+
+// Bildirim izni verilmişse aboneliği her açılışta sessizce tazele (iOS abonelikleri zamanla geçersiz olabiliyor).
+async function resync() {
+  if (role !== 'reader' || !('serviceWorker' in navigator) || !('PushManager' in window) || !vapid) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(vapid) });
+    await api('subscribe', { subscription: sub.toJSON() });
+  } catch (e) {}
+}
+
+function markSeen() {
+  if (role !== 'reader' || tab !== 'read') return;
+  poems.forEach(p => seen.add(p.id)); store.set('seen', JSON.stringify([...seen]));
+  try { navigator.clearAppBadge && navigator.clearAppBadge(); } catch (e) {}
 }
 
 function render() {
   const top = el('div', { class: 'top' }, el('h1', {}, 'Şiirlerim Sana'));
   if (role === 'admin') {
     top.append(el('div', { class: 'tabs', role: 'tablist' },
-      el('button', { role: 'tab', 'aria-selected': tab === 'read', onclick: () => { tab = 'read'; render(); } }, 'Oku'),
-      el('button', { role: 'tab', 'aria-selected': tab === 'write', onclick: () => { tab = 'write'; render(); } }, 'Yaz')));
+      el('button', { role: 'tab', 'aria-selected': String(tab === 'read'), onclick: () => { tab = 'read'; render(); } }, 'Oku'),
+      el('button', { role: 'tab', 'aria-selected': String(tab === 'write'), onclick: () => { tab = 'write'; render(); } }, 'Yaz')));
   }
-  app.replaceChildren(top, tab === 'write' && role === 'admin' ? writeView() : readView());
+  const view = tab === 'write' && role === 'admin' ? writeView() : readView();
+  app.replaceChildren(top, offline ? el('div', { class: 'offline' }, 'Çevrimdışısın. Son kaydedilen şiirler gösteriliyor.') : '', view);
+  markSeen();
 }
 
-function poemCard(p, latest) {
+async function copyText(text, btn) {
+  const old = btn.textContent;
+  try { await navigator.clipboard.writeText(text); btn.textContent = 'Kopyalandı'; }
+  catch (e) { btn.textContent = 'Kopyalanamadı'; }
+  setTimeout(() => btn.textContent = old, 1500);
+}
+
+function sizeChip() {
+  const order = ['s', 'm', 'l'];
+  return el('button', { class: 'chip', 'aria-label': 'Yazı boyutunu değiştir', onclick: () => {
+    const cur = document.documentElement.dataset.size || 'm';
+    const next = order[(order.indexOf(cur) + 1) % 3];
+    document.documentElement.dataset.size = next; store.set('size', next);
+  } }, 'Aa');
+}
+
+function poemCard(p, latest, isNew) {
+  const likeBtn = el('button', { class: 'chip', 'aria-pressed': String(!!p.liked), onclick: async () => {
+    const next = !p.liked; p.liked = next; likeBtn.setAttribute('aria-pressed', String(next)); likeBtn.textContent = next ? '♥ Beğendim' : '♡ Beğen';
+    store.set('poems', JSON.stringify(poems));
+    try { await api('like', { id: p.id, liked: next }); } catch (e) { p.liked = !next; likeBtn.setAttribute('aria-pressed', String(!next)); likeBtn.textContent = !next ? '♥ Beğendim' : '♡ Beğen'; }
+  } }, p.liked ? '♥ Beğendim' : '♡ Beğen');
+  const copyBtn = el('button', { class: 'chip', onclick: () => copyText((p.title ? p.title + '\n\n' : '') + p.body, copyBtn) }, 'Kopyala');
   return el('article', { class: 'poem' + (latest ? ' latest' : '') },
-    p.title ? el('h2', {}, p.title) : '', el('div', { class: 'text' }, p.body), el('div', { class: 'date' }, fmt(p.created_at)));
+    p.title ? el('h2', {}, p.title, isNew ? el('span', { class: 'badge' }, 'Yeni') : '') : (isNew ? el('span', { class: 'badge' }, 'Yeni') : ''),
+    el('div', { class: 'text' }, p.body),
+    el('div', { class: 'date' }, fmt(p.created_at) + (p.updated_at ? ' · düzenlendi' : '')),
+    el('div', { class: 'actions' }, likeBtn, copyBtn, sizeChip()));
 }
 
 function readView() {
   const box = el('div', { class: 'panel' });
   if (role === 'reader') box.append(notifBox());
-  if (!poems.length) { box.append(el('p', { class: 'muted' }, 'Henüz şiir yok. İlk şiir gelince burada görünecek.')); return box; }
-  box.append(poemCard(poems[0], true));
+  if (!poems.length) {
+    box.append(el('p', { class: 'muted' }, 'Henüz şiir yok. İlk şiir gelince burada görünecek.'),
+      el('button', { class: 'btn ghost', onclick: () => refresh() }, 'Yenile'));
+    return box;
+  }
+  const isNew = p => role === 'reader' && !seen.has(p.id);
+  box.append(poemCard(poems[0], true, isNew(poems[0])));
   if (poems.length > 1) {
     box.append(el('h2', {}, 'Önceki şiirler'));
     const list = el('div', { class: 'archive' });
     poems.slice(1).forEach(p => {
-      const open = el('div');
-      const b = el('button', { class: 'item', onclick: () => { open.replaceChildren(open.firstChild ? '' : poemCard(p)); } },
-        el('span', {}, p.title || p.body.split('\n')[0]), el('span', {}, fmt(p.created_at)));
-      list.append(el('div', {}, b, open));
+      const slot = el('div'); let open = false;
+      const b = el('button', { class: 'item', 'aria-expanded': 'false', onclick: () => {
+        open = !open; b.setAttribute('aria-expanded', String(open));
+        slot.replaceChildren(...(open ? [poemCard(p, false, false)] : []));
+      } }, el('span', {}, (p.liked ? '♥ ' : '') + firstLine(p)), el('span', {}, fmt(p.created_at)));
+      list.append(el('div', {}, b, slot));
     });
     box.append(list);
   }
+  box.append(el('button', { class: 'btn ghost', onclick: () => refresh() }, 'Yenile'));
   return box;
 }
 
 function notifBox() {
-  const box = el('div', { class: 'notice' });
-  const supported = 'serviceWorker' in navigator && 'PushManager' in window;
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (supported && Notification.permission === 'granted' && store.get('sub')) return el('div');
+  const box = el('div', { class: 'notice' });
   if (!supported || (ios && !standalone)) {
-    box.append(el('strong', {}, 'Bildirim almak için'), el('p', { class: 'muted' }, 'Safari’de paylaş düğmesine dokun, “Ana Ekrana Ekle”yi seç, sonra uygulamayı ana ekrandan aç.'));
+    box.append(el('strong', {}, 'Bildirim almak için'), el('p', { class: 'muted' }, 'Safari’de paylaş düğmesine dokun, “Ana Ekrana Ekle”yi seç, sonra uygulamayı ana ekrandaki simgeden aç.'));
     return box;
   }
-  const status = el('div', { class: 'status' });
+  const status = el('div', { class: 'status', role: 'status' });
   const btn = el('button', { class: 'btn' }, 'Bildirimleri aç');
   btn.onclick = async () => {
     btn.disabled = true; status.className = 'status'; status.textContent = '';
@@ -178,45 +276,89 @@ function notifBox() {
     } catch (e) { status.className = 'status err'; status.textContent = e.message; btn.disabled = false; }
   };
   box.append(el('strong', {}, 'Yeni şiir gelince haber vereyim mi?'), el('div', { class: 'row', style: 'margin-top:10px' }, btn), status);
-  if (store.get('sub') && Notification.permission === 'granted') { btn.hidden = true; status.textContent = 'Bildirimler açık.'; navigator.serviceWorker.register('sw.js'); }
   return box;
 }
 function b64(s) { const p = '='.repeat((4 - s.length % 4) % 4); const r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); }
 
+function pushMsg(push) {
+  if (!push) return '';
+  if (!push.devices) return ' Bildirim gönderilemedi: kayıtlı cihaz yok. Sevgilin bildirimleri açmalı.';
+  return ` Bildirim: ${push.sent} cihaza gitti${push.failed ? `, ${push.failed} cihaza gidemedi` : ''}.`;
+}
+
 function writeView() {
+  const draft = jget('draft', { title: '', body: '' });
+  const editP = editing && poems.find(p => p.id === editing);
   const st = el('div', { class: 'status', role: 'status' });
   const show = (m, err) => { st.className = 'status' + (err ? ' err' : ''); st.textContent = m; };
-  const title = el('input', { id: 'title', type: 'text', placeholder: 'Başlık (isteğe bağlı)' });
-  const body = el('textarea', { id: 'body', placeholder: 'Şiirini buraya yaz…' });
-  const notify = el('input', { id: 'notify', type: 'checkbox', checked: '' });
-  const pub = el('button', { class: 'btn' }, 'Yayınla');
+  const title = el('input', { id: 'title', type: 'text', placeholder: 'Başlık (isteğe bağlı)', value: editP ? editP.title : draft.title });
+  const body = el('textarea', { id: 'body', placeholder: 'Şiirini buraya yaz…' }, editP ? editP.body : draft.body);
+  const count = el('div', { class: 'count' });
+  const prev = el('div', { class: 'preview' });
+  const upd = () => {
+    const lines = body.value.split('\n').filter(x => x.trim()).length;
+    count.textContent = `${body.value.length} karakter · ${lines} satır`;
+    prev.replaceChildren(el('b', {}, title.value || 'Sana bir şiir var 💌'), body.value.trim().slice(0, 120) || 'Bildirimde şiirin ilk kısmı görünür.');
+  };
+  const saveDraft = () => { if (!editing) store.set('draft', JSON.stringify({ title: title.value, body: body.value })); upd(); };
+  title.addEventListener('input', saveDraft); body.addEventListener('input', saveDraft); upd();
+  const notify = el('input', { id: 'notify', type: 'checkbox', checked: !editing });
+  const notifyRow = editing ? '' : el('label', { class: 'check' }, notify, 'Yayınlayınca ona bildirim gönder');
+  const pub = el('button', { class: 'btn' }, editing ? 'Güncelle' : 'Yayınla');
   pub.onclick = async () => {
     pub.disabled = true;
     try {
+      if (editing) {
+        await api('update', { id: editing, title: title.value, body: body.value }); editing = null;
+        await refresh(true); show('Şiir güncellendi.'); render(); return;
+      }
       const r = await api('add', { title: title.value, body: body.value, notify: notify.checked });
-      poems = (await api('list')).poems; title.value = ''; body.value = '';
-      show(r.push ? `Yayınlandı. Bildirim gönderildi: ${r.push.sent}, başarısız: ${r.push.failed}.` : 'Yayınlandı.');
+      store.del('draft'); title.value = ''; body.value = ''; await refresh(true); upd();
+      show('Yayınlandı.' + pushMsg(r.push));
+      renderManage();
     } catch (e) { show(e.message, true); }
     pub.disabled = false;
   };
+  const cancel = editing ? el('button', { class: 'btn ghost', onclick: () => { editing = null; render(); } }, 'Vazgeç') : '';
+
   const mt = el('input', { id: 'mt', type: 'text', placeholder: 'Başlık', value: '💌' });
-  const mm = el('input', { id: 'mm', type: 'text', placeholder: 'Mesaj' });
+  const mm = el('input', { id: 'mm', type: 'text', placeholder: 'Kısa bir mesaj yaz' });
   const ms = el('div', { class: 'status', role: 'status' });
   const send = el('button', { class: 'btn ghost' }, 'Bildirim gönder');
   send.onclick = async () => {
     send.disabled = true; ms.className = 'status';
-    try { const r = await api('notify', { title: mt.value, message: mm.value }); ms.textContent = `Gönderildi: ${r.push.sent}, başarısız: ${r.push.failed}.`; mm.value = ''; }
+    try { const r = await api('notify', { title: mt.value, message: mm.value }); ms.textContent = 'Gönderildi.' + pushMsg(r.push); mm.value = ''; }
     catch (e) { ms.className = 'status err'; ms.textContent = e.message; }
     send.disabled = false;
   };
+
   const manage = el('div', { class: 'archive' });
-  poems.forEach(p => manage.append(el('div', { class: 'item' }, el('span', {}, p.title || p.body.split('\n')[0]),
-    el('button', { class: 'del', onclick: async () => { if (!p._c) { p._c = 1; render(); return; } await api('delete', { id: p.id }); poems = (await api('list')).poems; render(); } }, p._c ? 'Emin misin? Sil' : 'Sil'))));
-  return el('div', { class: 'panel' },
+  function renderManage() {
+    manage.replaceChildren();
+    poems.forEach(p => {
+      const del = el('button', { class: 'mini' }, 'Sil');
+      del.onclick = async () => {
+        if (del.dataset.c !== '1') { del.dataset.c = '1'; del.textContent = 'Emin misin?'; setTimeout(() => { del.dataset.c = ''; del.textContent = 'Sil'; }, 3000); return; }
+        await api('delete', { id: p.id }); await refresh(true); render();
+      };
+      manage.append(el('div', { class: 'itemrow' },
+        el('div', { class: 'item' }, el('span', {}, (p.liked ? '♥ ' : '') + firstLine(p)), el('span', {}, fmt(p.created_at))),
+        el('button', { class: 'mini', onclick: () => { editing = p.id; render(); window.scrollTo(0, 0); } }, 'Düzenle'), del));
+    });
+  }
+  renderManage();
+
+  const statBox = stats ? el('div', { class: 'stats' },
+    el('div', { class: 'stat' }, 'Bildirim alan cihaz: ', el('b', {}, String(stats.devices))),
+    el('div', { class: 'stat' }, 'Beğenilen şiir: ', el('b', { class: 'heart' }, String(stats.likes)))) : '';
+
+  return el('div', { class: 'panel' }, statBox,
+    editing ? el('strong', {}, 'Şiiri düzenliyorsun') : '',
     el('div', { class: 'field' }, el('label', { for: 'title' }, 'Başlık'), title),
-    el('div', { class: 'field' }, el('label', { for: 'body' }, 'Şiir'), body),
-    el('label', { class: 'check' }, notify, 'Yayınlayınca ona bildirim gönder'),
-    pub, st, el('hr'),
+    el('div', { class: 'field' }, el('label', { for: 'body' }, 'Şiir'), body, count),
+    notifyRow,
+    editing ? '' : el('div', { class: 'field' }, el('label', {}, 'Bildirimde böyle görünür'), prev),
+    el('div', { class: 'row' }, pub, cancel), st, el('hr'),
     el('h2', {}, 'Sadece bildirim'),
     el('div', { class: 'field' }, el('label', { for: 'mt' }, 'Başlık'), mt),
     el('div', { class: 'field' }, el('label', { for: 'mm' }, 'Mesaj'), mm),
@@ -224,6 +366,7 @@ function writeView() {
     el('h2', {}, 'Şiirler'), manage);
 }
 
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && role && code) refresh(tab === 'write').then(markSeen).catch(() => {}); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 boot();
 </script>
