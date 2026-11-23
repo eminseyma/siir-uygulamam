@@ -1,7 +1,7 @@
 {
-  "name": "Şiirlerim Sana",
-  "short_name": "Şiirler",
-  "description": "Sana yazdığım şiirler",
+  "name": "Anı Defterimiz",
+  "short_name": "Anılar",
+  "description": "Birlikte biriktirdiğimiz anılar ve şiirler",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
