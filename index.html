@@ -92,7 +92,10 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
 .preview b{display:block}
 .itemrow{display:flex;align-items:center;gap:8px}
 .itemrow .item{flex:1}
-.itemrow .item span:last-child{display:none}
+.seenline{margin-top:6px;text-align:center;font-size:.82rem;color:var(--muted);font-weight:600}
+.seenline.yes{color:var(--ok)}
+.itemrow .item span:last-child{font-weight:700}
+.seen-yes{color:var(--ok)!important}
 .short{min-height:96px;font-family:var(--body);font-size:1rem;line-height:1.5}
 .mini{background:var(--surface-solid);border:1.5px solid var(--line);border-radius:999px;padding:8px 14px;color:var(--muted);font-size:.82rem;min-height:42px;font-weight:700}
 .empty{text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;padding:30px 10px}
@@ -165,6 +168,7 @@ async function api(action, extra = {}) {
 }
 const fmt = d => new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
 const app = $('#app');
+const fmtT = d => new Date(d).toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 const firstLine = p => p.title || p.body.split('\n')[0];
 
 function gate(msg) {
@@ -221,9 +225,12 @@ async function resync() {
 }
 
 function markSeen() {
-  if (role !== 'reader' || tab !== 'read') return;
+  if (role !== 'reader' || tab !== 'read' || document.visibilityState === 'hidden') return;
   poems.forEach(p => seen.add(p.id)); store.set('seen', JSON.stringify([...seen]));
   try { navigator.clearAppBadge && navigator.clearAppBadge(); } catch (e) {}
+  const ids = poems.filter(p => !p.seen_at).map(p => p.id);
+  const now = new Date().toISOString(); ids.forEach(id => { const p = poems.find(x => x.id === id); if (p) p.seen_at = now; });
+  api('seen', { ids }).catch(() => { ids.forEach(id => { const p = poems.find(x => x.id === id); if (p) p.seen_at = null; }); });
 }
 
 function render() {
@@ -266,6 +273,7 @@ function poemCard(p, latest, isNew) {
     p.title ? el('h2', {}, p.title, isNew ? el('span', { class: 'badge' }, 'Yeni') : '') : (isNew ? el('span', { class: 'badge' }, 'Yeni') : ''),
     el('div', { class: 'text' }, p.body),
     el('div', { class: 'date' }, fmt(p.created_at) + (p.updated_at ? ' · düzenlendi' : '')),
+    role === 'admin' ? el('div', { class: 'seenline' + (p.seen_at ? ' yes' : '') }, p.seen_at ? '✓ Gördü · ' + fmtT(p.seen_at) : 'Henüz görmedi') : '',
     el('div', { class: 'actions' }, likeBtn, copyBtn, sizeChip()));
 }
 
@@ -294,6 +302,7 @@ function readView() {
     box.append(list);
   }
   box.append(el('button', { class: 'btn ghost', onclick: () => refresh() }, 'Yenile'));
+  if (role === 'reader') box.append(el('p', { class: 'muted', style: 'text-align:center;font-size:.8rem;margin:0' }, 'Şiirleri okuduğunda ona görünür ♥'));
   return box;
 }
 
@@ -390,7 +399,7 @@ function writeView() {
         await api('delete', { id: p.id }); await refresh(true); render();
       };
       manage.append(el('div', { class: 'itemrow' },
-        el('div', { class: 'item' }, el('span', {}, (p.liked ? '♥ ' : '') + firstLine(p)), el('span', {}, fmt(p.created_at))),
+        el('div', { class: 'item' }, el('span', {}, (p.liked ? '♥ ' : '') + firstLine(p)), el('span', { class: p.seen_at ? 'seen-yes' : 'seen-no' }, p.seen_at ? '✓ Gördü' : 'Görmedi')),
         el('button', { class: 'mini', onclick: () => { editing = p.id; render(); window.scrollTo(0, 0); } }, 'Düzenle'), del));
     });
   }
@@ -398,7 +407,8 @@ function writeView() {
 
   const statBox = stats ? el('div', { class: 'stats' },
     el('div', { class: 'stat' }, 'Bildirim alan cihaz: ', el('b', {}, String(stats.devices))),
-    el('div', { class: 'stat' }, 'Beğenilen şiir: ', el('b', { class: 'heart' }, String(stats.likes)))) : '';
+    el('div', { class: 'stat' }, 'Beğenilen şiir: ', el('b', { class: 'heart' }, String(stats.likes))),
+    el('div', { class: 'stat' }, 'Son açtığı an: ', el('b', {}, stats.last_open ? fmtT(stats.last_open) : 'henüz açmadı'))) : '';
 
   return el('div', { class: 'panel' }, statBox,
     editing ? el('strong', {}, 'Şiiri düzenliyorsun') : '',
