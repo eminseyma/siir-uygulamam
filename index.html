@@ -93,6 +93,7 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
 .itemrow{display:flex;align-items:center;gap:8px}
 .itemrow .item{flex:1}
 .itemrow .item span:last-child{display:none}
+.short{min-height:96px;font-family:var(--body);font-size:1rem;line-height:1.5}
 .mini{background:var(--surface-solid);border:1.5px solid var(--line);border-radius:999px;padding:8px 14px;color:var(--muted);font-size:.82rem;min-height:42px;font-weight:700}
 .empty{text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;padding:30px 10px}
 .empty .big{font-family:var(--hand);font-size:1.8rem;line-height:1.3;color:var(--rose)}
@@ -339,14 +340,16 @@ function writeView() {
   const title = el('input', { id: 'title', type: 'text', placeholder: 'Başlık (isteğe bağlı)', value: editP ? editP.title : draft.title });
   const body = el('textarea', { id: 'body', placeholder: 'Şiirini buraya yaz…' }, editP ? editP.body : draft.body);
   const count = el('div', { class: 'count' });
+  const nt = el('input', { id: 'nt', type: 'text', placeholder: 'Boş bırakırsan şiir başlığı kullanılır', maxlength: '100' });
+  const nb = el('textarea', { id: 'nb', class: 'short', placeholder: 'Boş bırakırsan şiirin ilk satırları gider', maxlength: '500' });
   const prev = el('div', { class: 'preview' });
   const upd = () => {
     const lines = body.value.split('\n').filter(x => x.trim()).length;
     count.textContent = `${body.value.length} karakter · ${lines} satır`;
-    prev.replaceChildren(el('b', {}, title.value || 'Sana bir şiir var 💌'), body.value.trim().slice(0, 120) || 'Bildirimde şiirin ilk kısmı görünür.');
+    prev.replaceChildren(el('b', {}, nt.value.trim() || title.value || 'Sana bir şiir var 💌'), nb.value.trim() || body.value.trim().slice(0, 120) || 'Bildirimde şiirin ilk kısmı görünür.');
   };
   const saveDraft = () => { if (!editing) store.set('draft', JSON.stringify({ title: title.value, body: body.value })); upd(); };
-  title.addEventListener('input', saveDraft); body.addEventListener('input', saveDraft); upd();
+  title.addEventListener('input', saveDraft); body.addEventListener('input', saveDraft); nt.addEventListener('input', upd); nb.addEventListener('input', upd); upd();
   const notify = el('input', { id: 'notify', type: 'checkbox', checked: !editing });
   const notifyRow = editing ? '' : el('label', { class: 'check' }, notify, 'Yayınlayınca ona bildirim gönder');
   const pub = el('button', { class: 'btn' }, editing ? 'Güncelle' : 'Yayınla');
@@ -357,8 +360,8 @@ function writeView() {
         await api('update', { id: editing, title: title.value, body: body.value }); editing = null;
         await refresh(true); show('Şiir güncellendi.'); render(); return;
       }
-      const r = await api('add', { title: title.value, body: body.value, notify: notify.checked });
-      store.del('draft'); title.value = ''; body.value = ''; await refresh(true); upd();
+      const r = await api('add', { title: title.value, body: body.value, notify: notify.checked, notify_title: nt.value, notify_body: nb.value });
+      store.del('draft'); title.value = ''; body.value = ''; nt.value = ''; nb.value = ''; await refresh(true); upd();
       show('Yayınlandı.' + pushMsg(r.push));
       renderManage();
     } catch (e) { show(e.message, true); }
@@ -367,7 +370,7 @@ function writeView() {
   const cancel = editing ? el('button', { class: 'btn ghost', onclick: () => { editing = null; render(); } }, 'Vazgeç') : '';
 
   const mt = el('input', { id: 'mt', type: 'text', placeholder: 'Başlık', value: '💌' });
-  const mm = el('input', { id: 'mm', type: 'text', placeholder: 'Kısa bir mesaj yaz' });
+  const mm = el('textarea', { id: 'mm', class: 'short', placeholder: 'Ona göndermek istediğin her şeyi yaz', maxlength: '500' });
   const ms = el('div', { class: 'status', role: 'status' });
   const send = el('button', { class: 'btn ghost' }, 'Bildirim gönder');
   send.onclick = async () => {
@@ -402,6 +405,8 @@ function writeView() {
     el('div', { class: 'field' }, el('label', { for: 'title' }, 'Başlık'), title),
     el('div', { class: 'field' }, el('label', { for: 'body' }, 'Şiir'), body, count),
     notifyRow,
+    editing ? '' : el('div', { class: 'field' }, el('label', { for: 'nt' }, 'Bildirim başlığı (isteğe bağlı)'), nt),
+    editing ? '' : el('div', { class: 'field' }, el('label', { for: 'nb' }, 'Bildirim metni (isteğe bağlı)'), nb),
     editing ? '' : el('div', { class: 'field' }, el('label', {}, 'Bildirimde böyle görünür'), prev),
     el('div', { class: 'row' }, pub, cancel), st, el('hr'),
     el('h2', {}, 'Sadece bildirim'),
