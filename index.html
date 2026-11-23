@@ -426,7 +426,7 @@ function moodStrip() {
     const sub = p.mood ? `${p.mood} ${p.mood_text || moodName(p.mood)}${p.mood_at ? ' · ' + rel(p.mood_at) : ''}` : (mine ? 'Ruh halini paylaş' : 'Henüz paylaşmadı');
     const av = el('div', { class: 'avatar' + (r === 'reader' ? ' b' : '') }, photoOrInitial(r), p.mood ? el('span', { class: 'mm' }, p.mood) : '');
     const body = [av, el('div', { class: 't' }, el('b', {}, nameOf(r)), el('span', {}, sub))];
-    return mine ? el('button', { class: 'mood', type: 'button', onclick: moodSheet, 'aria-label': 'Ruh halimi değiştir' }, body) : el('div', { class: 'mood' }, body);
+    return mine ? el('button', { class: 'mood', type: 'button', onclick: moodSheet, 'aria-label': 'Ruh halimi değiştir' }, body) : el('button', { class: 'mood', type: 'button', onclick: () => partnerSheet(r), 'aria-label': nameOf(r) + ' profilini aç' }, body);
   };
   return el('div', { class: 'moods' }, chip(role), chip(oth(role)));
 }
@@ -489,6 +489,21 @@ function moodSheet() {
   } }, 'Paylaş');
   close = openSheet('Bugün nasılsın?', row, el('div', { class: 'field' }, el('label', { for: 'mtxt' }, 'Kısa not'), txt),
     el('label', { class: 'toggle' }, `${nameOther()} bildirim alsın`, nt), st, save);
+}
+function partnerSheet(r) {
+  const p = P[r] || {};
+  const av = el('div', { class: 'avatar' + (r === 'reader' ? ' b' : ''), style: 'width:88px;height:88px;font-size:2.2rem;margin:0 auto' }, photoOrInitial(r));
+  const rows = [
+    ['Kullanıcı adı', p.username || 'Henüz yazılmamış'],
+    ['Sana verdiği isim', (p.calls_other || '').trim() || 'Henüz yazılmamış'],
+    ['Ona taktığın isim', (P[role]?.calls_other || '').trim() || 'Henüz vermedin'],
+    ['Ruh hali', p.mood ? `${p.mood} ${p.mood_text || moodName(p.mood)}` : 'Henüz paylaşmadı'],
+  ];
+  const close = openSheet(nameOf(r) + ' hakkında',
+    el('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:6px' }, av, el('b', { style: 'font-size:1.1rem;margin-top:6px' }, nameOf(r))),
+    el('div', { class: 'archive' }, rows.map(([k, v]) => el('div', { class: 'item', style: 'flex-direction:column;gap:2px' }, el('span', { class: 'cap-label', style: 'font-size:.7rem' }, k), el('span', { style: 'font-weight:700;font-size:1rem' }, v)))),
+    p.mood_at ? el('p', { class: 'muted', style: 'margin:0;text-align:center' }, 'Ruh hali ' + rel(p.mood_at) + ' güncellendi') : '',
+    el('button', { class: 'btn ghost', type: 'button', onclick: () => close() }, 'Kapat'));
 }
 function profileSheet() {
   const me = P[role] || {}, ot = P[oth(role)] || {};
