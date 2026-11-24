@@ -62,7 +62,7 @@ input[type=text],input[type=password],input[type=date],textarea{background:var(-
 textarea{min-height:200px;resize:vertical;font-family:var(--hand);font-size:1.5rem;line-height:1.35}
 textarea.short{min-height:96px;font-family:var(--body);font-size:1rem;line-height:1.5}
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.top h1::first-letter{font-size:1.55em;line-height:1}
+.top h1 .cap{font-size:1.9em;line-height:.8;display:inline-block;vertical-align:baseline}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .panel{display:flex;flex-direction:column;gap:16px}
 .status{min-height:1.4em;font-size:.92rem;color:var(--ok);font-weight:600}
@@ -415,7 +415,7 @@ function renderChrome() {
 /* ---------- Ortak parçalar ---------- */
 function header(title, sub) {
   const av = el('button', { class: 'avatar' + (role === 'reader' ? ' b' : ''), type: 'button', 'aria-label': 'Profilim', onclick: profileSheet }, photoOrInitial(role));
-  return el('div', { class: 'panel', style: 'gap:10px' }, el('div', { class: 'top' }, el('h1', {}, title), av), sub ? el('p', { class: 'sub' }, sub) : '');
+  return el('div', { class: 'panel', style: 'gap:10px' }, el('div', { class: 'top' }, el('h1', {}, el('span', { class: 'cap' }, title.slice(0, 1)), title.slice(1)), av), sub ? el('p', { class: 'sub' }, sub) : '');
 }
 function polaroid(ph, w, rot, tape, onclick) {
   return el('div', { class: 'pol', role: onclick ? 'button' : false, tabindex: onclick ? '0' : false, style: `width:${w}px;transform:rotate(${rot}deg)`,
