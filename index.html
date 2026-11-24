@@ -752,7 +752,12 @@ function chatWriteView() {
   const title = el('input', { id: 'ctitle', type: 'text', placeholder: 'Başlık (isteğe bağlı)', value: editM ? editM.title : draft.title });
   const body = el('textarea', { id: 'cbody', placeholder: 'Ona yazmak istediklerini buraya yaz…' }, editM ? editM.body : draft.body);
   const count = el('div', { class: 'count' });
-  const upd = () => { const lines = body.value.split('\n').filter(x => x.trim()).length; count.textContent = `${body.value.length} karakter · ${lines} satır`; };
+  const nt = el('input', { id: 'cnt', type: 'text', placeholder: 'Boş bırakırsan yazı başlığı kullanılır', maxlength: '100' });
+  const nb = el('textarea', { id: 'cnb', class: 'short', placeholder: 'Boş bırakırsan yazının ilk satırları gider', maxlength: '500' });
+  const prev = el('div', { class: 'preview' });
+  const upd = () => { const lines = body.value.split('\n').filter(x => x.trim()).length; count.textContent = `${body.value.length} karakter · ${lines} satır`;
+    prev.replaceChildren(el('b', {}, nt.value.trim() || title.value || `${nameMe()} sana yazdı 💌`), nb.value.trim() || body.value.trim().slice(0, 120) || 'Bildirimde yazının ilk kısmı görünür.'); };
+  nt.addEventListener('input', upd); nb.addEventListener('input', upd);
   const saveDraft = () => { if (!cediting) store.set(key, JSON.stringify({ title: title.value, body: body.value })); upd(); };
   title.addEventListener('input', saveDraft); body.addEventListener('input', saveDraft); upd();
   const notify = el('input', { id: 'cnotify', type: 'checkbox', checked: true });
@@ -760,8 +765,8 @@ function chatWriteView() {
   pub.onclick = async () => { pub.disabled = true;
     try {
       if (cediting) { await api('chat_update', { id: cediting, title: title.value, body: body.value }); cediting = null; await refreshAll(); ctab = 'read'; render(); return; }
-      const r = await api('chat_send', { title: title.value, body: body.value, notify: notify.checked });
-      store.del(key); title.value = ''; body.value = ''; await refreshAll(); upd(); show('Gönderildi.' + pushMsg(r.push)); renderManage();
+      const r = await api('chat_send', { title: title.value, body: body.value, notify: notify.checked, notify_title: nt.value, notify_body: nb.value });
+      store.del(key); title.value = ''; body.value = ''; nt.value = ''; nb.value = ''; await refreshAll(); upd(); show('Gönderildi.' + pushMsg(r.push)); renderManage();
     } catch (e) { show(e.message, true); } pub.disabled = false; };
   const manage = el('div', { class: 'archive' });
   function renderManage() { manage.replaceChildren(); chats.filter(m => m.author === role).forEach(m => { const del = el('button', { class: 'mini', type: 'button' }, 'Sil');
@@ -773,6 +778,9 @@ function chatWriteView() {
   return el('div', { class: 'panel' }, cediting ? el('strong', {}, 'Yazını düzenliyorsun') : '',
     el('div', { class: 'field' }, el('label', { for: 'ctitle' }, 'Başlık'), title), el('div', { class: 'field' }, el('label', { for: 'cbody' }, 'Yazı'), body, count),
     cediting ? '' : el('label', { class: 'check' }, notify, 'Gönderince ona bildirim gönder'),
+    cediting ? '' : el('div', { class: 'field' }, el('label', { for: 'cnt' }, 'Bildirim başlığı (isteğe bağlı)'), nt),
+    cediting ? '' : el('div', { class: 'field' }, el('label', { for: 'cnb' }, 'Bildirim metni (isteğe bağlı)'), nb),
+    cediting ? '' : el('div', { class: 'field' }, el('label', {}, 'Bildirimde böyle görünür'), prev),
     el('div', { class: 'row' }, pub, cediting ? el('button', { class: 'btn ghost', type: 'button', onclick: () => { cediting = null; render(); } }, 'Vazgeç') : ''), st, el('hr'),
     el('h2', {}, 'Yazdıklarım'), manage);
 }
