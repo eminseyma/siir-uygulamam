@@ -62,7 +62,7 @@ input[type=text],input[type=password],input[type=date],textarea{background:var(-
 textarea{min-height:200px;resize:vertical;font-family:var(--hand);font-size:1.5rem;line-height:1.35}
 textarea.short{min-height:96px;font-family:var(--body);font-size:1rem;line-height:1.5}
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.top h1::first-letter{font-size:1.3em}
+.top h1::first-letter{font-size:1.55em;line-height:1}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .panel{display:flex;flex-direction:column;gap:16px}
 .status{min-height:1.4em;font-size:.92rem;color:var(--ok);font-weight:600}
@@ -112,11 +112,6 @@ textarea.short{min-height:96px;font-family:var(--body);font-size:1rem;line-heigh
 .navdot{position:absolute;top:4px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--rose-deep);border:1.5px solid var(--surface-solid)}
 .nav button[aria-current=page]{background:linear-gradient(135deg,var(--rose2),var(--rose));color:var(--rose-ink)}
 .nav svg{width:18px;height:18px}
-body[data-view="chat"] main{padding-bottom:210px}
-.chatbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));width:calc(100% - 36px);max-width:524px;z-index:6;display:flex;gap:8px;align-items:center;background:var(--surface-solid);border:1.5px solid var(--line);border-radius:999px;padding:7px;box-shadow:var(--shadow)}
-.chatbar input{flex:1;min-width:0;border:0;background:transparent;padding:0 14px;min-height:42px;border-radius:999px}
-.chatlist{display:flex;flex-direction:column;gap:10px}
-.chatday{text-align:center;font-size:.75rem;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:6px 0}
 .fab{position:fixed;z-index:6;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(90px + env(safe-area-inset-bottom,0px));width:60px;height:60px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--rose2),var(--rose));display:grid;place-items:center;box-shadow:0 10px 24px rgba(217,63,107,.4)}
 .fab svg{width:26px;height:26px}
 .overlay{position:fixed;inset:0;z-index:20;background:rgba(40,16,30,.5);display:flex;align-items:flex-end;justify-content:center}
@@ -305,7 +300,7 @@ const jget = (k, d) => { try { return JSON.parse(store.get(k)) ?? d } catch (e) 
 
 let code = store.get('code'), role = store.get('role'), vapid = null, P = jget('profiles', { admin: {}, reader: {} });
 let poems = jget('poems', []), mems = jget('mems', []), chats = jget('chats', []), offline = false, stats = null;
-let view = 'mems', param = null, tab = 'read', filter = 'all', ed = null, editing = null, seenPoems = new Set(jget('seen', []));
+let view = 'mems', param = null, tab = 'read', ctab = 'read', cediting = null, filter = 'all', ed = null, editing = null, seenPoems = new Set(jget('seen', []));
 document.documentElement.dataset.size = store.get('size') || 'm';
 
 const hashCode = (location.hash.match(/k=([\w-]+)/) || [])[1];
@@ -404,17 +399,17 @@ function render() {
   app.replaceChildren(offline ? el('div', { class: 'offline' }, 'Çevrimdışısın. Son kaydedilenler gösteriliyor.') : '', node);
   renderChrome();
   if (view === 'poems') markPoemsSeen();
-  if (view === 'chat') { markChatSeen(); setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 0); }
+  if (view === 'chat') markChatSeen();
   lastSig = sig();
 }
 function renderChrome() {
   const main = ['mems', 'album', 'poems', 'chat'].includes(view);
   const unread = chats.filter(m => m.author === oth(role) && !m.seen_at).length;
-  const items = [['mems', 'Anılar', ICON.book], ['poems', 'Şiirler', ICON.heart], ['chat', 'Mesajlar', ICON.chat], ['album', 'Albüm', ICON.photo]];
+  const items = [['mems', 'Anılar', ICON.book], ['poems', 'Şiirler', ICON.heart], ['chat', 'Yazılar', ICON.chat], ['album', 'Albüm', ICON.photo]];
   const nav = main ? el('nav', { class: 'nav', 'aria-label': 'Ana menü' }, items.map(([k, l, ic]) =>
     el('button', { type: 'button', 'aria-current': view === k ? 'page' : false, onclick: () => go(k) }, svg(ic), view === k ? l : el('span', { class: 'sr', style: 'position:absolute;width:1px;height:1px;overflow:hidden' }, l), k === 'chat' && unread && view !== 'chat' ? el('span', { class: 'navdot', 'aria-label': unread + ' okunmamış mesaj' }) : ''))) : '';
   const fab = view === 'mems' ? el('button', { class: 'fab', type: 'button', 'aria-label': 'Yeni anı ekle', onclick: () => startEditor(null) }, svg(ICON.plus, 'stroke="#fff" stroke-width="2.6"')) : '';
-  chrome.replaceChildren(nav, fab, view === 'chat' ? chatBar() : '');
+  chrome.replaceChildren(nav, fab);
 }
 
 /* ---------- Ortak parçalar ---------- */
@@ -700,40 +695,86 @@ function albumView() {
   return box;
 }
 
-/* ---------- Mesajlar ---------- */
+/* ---------- Yazılar (birbirimize yazdıklarımız) ---------- */
 function markChatSeen() {
-  if (document.visibilityState === 'hidden') return;
+  if (ctab !== 'read' || document.visibilityState === 'hidden') return;
   const unseen = chats.filter(m => m.author === oth(role) && !m.seen_at);
   if (!unseen.length) return;
   const now = new Date().toISOString(); unseen.forEach(m => m.seen_at = now);
   api('chat_seen').catch(() => { unseen.forEach(m => m.seen_at = null); });
 }
-function chatDay(d) { const n = new Date(d), t = new Date();
-  const same = n.toDateString() === t.toDateString(); const y = new Date(t); y.setDate(t.getDate() - 1);
-  if (same) return 'Bugün'; if (n.toDateString() === y.toDateString()) return 'Dün';
-  return n.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }); }
+const cFirst = m => m.title || m.body.split('\n')[0];
+function chatCard(m, latest, isNew) {
+  const mine = m.author === role;
+  const likeBtn = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(!!m.liked), onclick: async () => {
+    const next = !m.liked; m.liked = next; likeBtn.setAttribute('aria-pressed', String(next)); likeBtn.textContent = next ? '♥ Beğendim' : '♡ Beğen';
+    try { await api('chat_like', { id: m.id, liked: next }); } catch (e) { m.liked = !next; likeBtn.setAttribute('aria-pressed', String(!next)); likeBtn.textContent = !next ? '♥ Beğendim' : '♡ Beğen'; }
+  } }, m.liked ? '♥ Beğendim' : '♡ Beğen');
+  const copyBtn = el('button', { class: 'chip', type: 'button', onclick: () => copyText((m.title ? m.title + '\n\n' : '') + m.body, copyBtn) }, 'Kopyala');
+  const badge = isNew ? el('span', { class: 'badge' }, 'Yeni') : '';
+  return el('article', { class: 'poem' + (latest ? ' latest' : '') },
+    el('div', { class: 'date' }, (mine ? 'Sen yazdın' : nameOf(m.author) + ' yazdı')),
+    m.title ? el('h2', {}, m.title, badge) : badge,
+    el('div', { class: 'text' }, m.body), el('div', { class: 'date' }, fmt(m.created_at) + (m.updated_at ? ' · düzenlendi' : '')),
+    mine ? el('div', { class: 'seenline' + (m.seen_at ? ' yes' : '') }, m.seen_at ? '✓ Gördü · ' + fmtT(m.seen_at) : 'Henüz görmedi') : '',
+    el('div', { class: 'actions' }, mine ? '' : likeBtn, copyBtn, sizeChip()));
+}
 function chatView() {
   const box = el('div', { class: 'panel' });
-  box.append(header('Mesajlarımız', 'Aklından geçeni ona yaz ♥'));
-  const list = el('div', { class: 'chatlist' });
-  if (!chats.length) list.append(el('div', { class: 'empty' }, el('div', { class: 'big' }, 'İlk mesajı sen yaz ♥'), el('div', { class: 'muted' }, 'Aşağıdan yazıp gönderebilirsin.')));
-  let curDay = '';
-  chats.forEach(m => { const d = chatDay(m.created_at); if (d !== curDay) { curDay = d; list.append(el('div', { class: 'chatday' }, d)); }
-    const me = m.author === role;
-    list.append(el('div', { style: `display:flex;flex-direction:column;gap:3px;align-items:${me ? 'flex-end' : 'flex-start'}` },
-      el('div', { class: 'bubble' + (me ? ' me' : '') }, m.body),
-      el('span', { class: 'bwho' }, `${nameOf(m.author)} · ${fmtT(m.created_at)}${me && m.seen_at ? ' · ✓ görüldü' : ''}`))); });
-  box.append(list);
+  const head = header('Yazılarımız', 'Birbirimize yazdıklarımız ♥');
+  head.append(el('div', { class: 'tabs', role: 'tablist' },
+    el('button', { role: 'tab', 'aria-selected': String(ctab === 'read'), onclick: () => { ctab = 'read'; render(); } }, 'Oku'),
+    el('button', { role: 'tab', 'aria-selected': String(ctab === 'write'), onclick: () => { ctab = 'write'; render(); } }, 'Yaz')));
+  box.append(head, ctab === 'write' ? chatWriteView() : chatReadView());
   return box;
 }
-function chatBar() {
-  const input = el('input', { id: 'chatinput', type: 'text', maxlength: '2000', placeholder: 'Bir şeyler yaz…', 'aria-label': 'Mesaj yaz' });
-  const send = el('button', { class: 'avatar b', type: 'button', 'aria-label': 'Gönder', style: 'width:40px;height:40px;border:0;flex:none' }, svg(ICON.send, 'style="width:18px;height:18px" stroke="#fff"'));
-  const doSend = async () => { const t = input.value.trim(); if (!t) return; input.value = ''; send.disabled = true;
-    try { const r = await api('chat_send', { body: t }); chats.push(r.message); store.set('chats', JSON.stringify(chats)); render(); }
-    catch (e) { input.value = t; alert(e.message); } send.disabled = false; };
-  send.onclick = doSend; input.addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
-  return el('div', { class: 'chatbar' }, input, send);
+function chatReadView() {
+  const box = el('div', { class: 'panel' });
+  if (!chats.length) { box.append(el('div', { class: 'empty' }, el('div', { class: 'big' }, 'Birbirimize yazdıklarımız ♥'), el('div', { class: 'muted' }, 'İlk yazıyı “Yaz” sekmesinden yazabilirsin.'))); return box; }
+  const theirs = chats.filter(m => m.author !== role);
+  const top = theirs[0] || chats[0];
+  box.append(chatCard(top, true, top.author !== role && !top.seen_at));
+  const rest = chats.filter(m => m !== top);
+  if (rest.length) {
+    box.append(el('h2', {}, 'Önceki yazılar'));
+    const list = el('div', { class: 'archive' });
+    rest.forEach(m => { const slot = el('div'); let open = false;
+      const b = el('button', { class: 'item', 'aria-expanded': 'false', onclick: () => { open = !open; b.setAttribute('aria-expanded', String(open)); slot.replaceChildren(...(open ? [chatCard(m, false, false)] : [])); } },
+        el('span', {}, (m.liked ? '♥ ' : '') + (m.author === role ? '↗ ' : '') + cFirst(m)), el('span', {}, fmt(m.created_at))); list.append(el('div', {}, b, slot)); });
+    box.append(list);
+  }
+  box.append(el('p', { class: 'muted', style: 'text-align:center;font-size:.8rem;margin:0' }, 'Okuduğunda yazan kişiye “Gördü” olarak görünür ♥'));
+  return box;
+}
+function chatWriteView() {
+  const key = 'cdraft'; const draft = jget(key, { title: '', body: '' }); const editM = cediting && chats.find(m => m.id === cediting);
+  const st = el('div', { class: 'status', role: 'status' }); const show = (m, err) => { st.className = 'status' + (err ? ' err' : ''); st.textContent = m; };
+  const title = el('input', { id: 'ctitle', type: 'text', placeholder: 'Başlık (isteğe bağlı)', value: editM ? editM.title : draft.title });
+  const body = el('textarea', { id: 'cbody', placeholder: 'Ona yazmak istediklerini buraya yaz…' }, editM ? editM.body : draft.body);
+  const count = el('div', { class: 'count' });
+  const upd = () => { const lines = body.value.split('\n').filter(x => x.trim()).length; count.textContent = `${body.value.length} karakter · ${lines} satır`; };
+  const saveDraft = () => { if (!cediting) store.set(key, JSON.stringify({ title: title.value, body: body.value })); upd(); };
+  title.addEventListener('input', saveDraft); body.addEventListener('input', saveDraft); upd();
+  const notify = el('input', { id: 'cnotify', type: 'checkbox', checked: true });
+  const pub = el('button', { class: 'btn', type: 'button' }, cediting ? 'Güncelle' : 'Gönder');
+  pub.onclick = async () => { pub.disabled = true;
+    try {
+      if (cediting) { await api('chat_update', { id: cediting, title: title.value, body: body.value }); cediting = null; await refreshAll(); ctab = 'read'; render(); return; }
+      const r = await api('chat_send', { title: title.value, body: body.value, notify: notify.checked });
+      store.del(key); title.value = ''; body.value = ''; await refreshAll(); upd(); show('Gönderildi.' + pushMsg(r.push)); renderManage();
+    } catch (e) { show(e.message, true); } pub.disabled = false; };
+  const manage = el('div', { class: 'archive' });
+  function renderManage() { manage.replaceChildren(); chats.filter(m => m.author === role).forEach(m => { const del = el('button', { class: 'mini', type: 'button' }, 'Sil');
+    del.onclick = async () => { if (del.dataset.c !== '1') { del.dataset.c = '1'; del.textContent = 'Emin misin?'; setTimeout(() => { del.dataset.c = ''; del.textContent = 'Sil'; }, 3000); return; }
+      await api('chat_delete', { id: m.id }); await refreshAll(); render(); };
+    manage.append(el('div', { class: 'itemrow' }, el('div', { class: 'item' }, el('span', {}, (m.liked ? '♥ ' : '') + cFirst(m)), el('span', { class: m.seen_at ? 'seen-yes' : '' }, m.seen_at ? '✓ Gördü' : 'Görmedi')),
+      el('button', { class: 'mini', type: 'button', onclick: () => { cediting = m.id; render(); window.scrollTo(0, 0); } }, 'Düzenle'), del)); }); }
+  renderManage();
+  return el('div', { class: 'panel' }, cediting ? el('strong', {}, 'Yazını düzenliyorsun') : '',
+    el('div', { class: 'field' }, el('label', { for: 'ctitle' }, 'Başlık'), title), el('div', { class: 'field' }, el('label', { for: 'cbody' }, 'Yazı'), body, count),
+    cediting ? '' : el('label', { class: 'check' }, notify, 'Gönderince ona bildirim gönder'),
+    el('div', { class: 'row' }, pub, cediting ? el('button', { class: 'btn ghost', type: 'button', onclick: () => { cediting = null; render(); } }, 'Vazgeç') : ''), st, el('hr'),
+    el('h2', {}, 'Yazdıklarım'), manage);
 }
 
 /* ---------- Şiirler ---------- */
