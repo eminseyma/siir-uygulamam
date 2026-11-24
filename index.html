@@ -768,6 +768,13 @@ function chatWriteView() {
       const r = await api('chat_send', { title: title.value, body: body.value, notify: notify.checked, notify_title: nt.value, notify_body: nb.value });
       store.del(key); title.value = ''; body.value = ''; nt.value = ''; nb.value = ''; await refreshAll(); upd(); show('Gönderildi.' + pushMsg(r.push)); renderManage();
     } catch (e) { show(e.message, true); } pub.disabled = false; };
+  const mt = el('input', { id: 'cmt', type: 'text', placeholder: 'Başlık', value: '💌' });
+  const mm = el('textarea', { id: 'cmm', class: 'short', placeholder: 'Ona göndermek istediğin her şeyi yaz', maxlength: '500' });
+  const ms = el('div', { class: 'status', role: 'status' });
+  const sendN = el('button', { class: 'btn ghost', type: 'button' }, 'Bildirim gönder');
+  sendN.onclick = async () => { sendN.disabled = true; ms.className = 'status';
+    try { const r = await api('chat_notify', { title: mt.value, message: mm.value }); ms.textContent = 'Gönderildi.' + pushMsg(r.push); mm.value = ''; }
+    catch (e) { ms.className = 'status err'; ms.textContent = e.message; } sendN.disabled = false; };
   const manage = el('div', { class: 'archive' });
   function renderManage() { manage.replaceChildren(); chats.filter(m => m.author === role).forEach(m => { const del = el('button', { class: 'mini', type: 'button' }, 'Sil');
     del.onclick = async () => { if (del.dataset.c !== '1') { del.dataset.c = '1'; del.textContent = 'Emin misin?'; setTimeout(() => { del.dataset.c = ''; del.textContent = 'Sil'; }, 3000); return; }
@@ -782,7 +789,8 @@ function chatWriteView() {
     cediting ? '' : el('div', { class: 'field' }, el('label', { for: 'cnb' }, 'Bildirim metni (isteğe bağlı)'), nb),
     cediting ? '' : el('div', { class: 'field' }, el('label', {}, 'Bildirimde böyle görünür'), prev),
     el('div', { class: 'row' }, pub, cediting ? el('button', { class: 'btn ghost', type: 'button', onclick: () => { cediting = null; render(); } }, 'Vazgeç') : ''), st, el('hr'),
-    el('h2', {}, 'Yazdıklarım'), manage);
+    el('h2', {}, 'Sadece bildirim'), el('div', { class: 'field' }, el('label', { for: 'cmt' }, 'Başlık'), mt), el('div', { class: 'field' }, el('label', { for: 'cmm' }, 'Mesaj'), mm), sendN, ms,
+    el('hr'), el('h2', {}, 'Yazdıklarım'), manage);
 }
 
 /* ---------- Şiirler ---------- */
