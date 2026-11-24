@@ -775,7 +775,7 @@ function chatWriteView() {
     manage.append(el('div', { class: 'itemrow' }, el('div', { class: 'item' }, el('span', {}, (m.liked ? '♥ ' : '') + cFirst(m)), el('span', { class: m.seen_at ? 'seen-yes' : '' }, m.seen_at ? '✓ Gördü' : 'Görmedi')),
       el('button', { class: 'mini', type: 'button', onclick: () => { cediting = m.id; render(); window.scrollTo(0, 0); } }, 'Düzenle'), del)); }); }
   renderManage();
-  return el('div', { class: 'panel' }, cediting ? el('strong', {}, 'Yazını düzenliyorsun') : '',
+  return el('div', { class: 'panel' }, statBox(), cediting ? el('strong', {}, 'Yazını düzenliyorsun') : '',
     el('div', { class: 'field' }, el('label', { for: 'ctitle' }, 'Başlık'), title), el('div', { class: 'field' }, el('label', { for: 'cbody' }, 'Yazı'), body, count),
     cediting ? '' : el('label', { class: 'check' }, notify, 'Gönderince ona bildirim gönder'),
     cediting ? '' : el('div', { class: 'field' }, el('label', { for: 'cnt' }, 'Bildirim başlığı (isteğe bağlı)'), nt),
@@ -839,6 +839,10 @@ function poemReadView() {
 }
 function pushMsg(push) { if (!push) return ''; if (!push.devices) return ' Bildirim gönderilemedi: kayıtlı cihaz yok. Sevgilin bildirimleri açmalı.';
   return ` Bildirim: ${push.sent} cihaza gitti${push.failed ? `, ${push.failed} cihaza gidemedi` : ''}.`; }
+function statBox() {
+  return stats ? el('div', { class: 'stats' }, el('div', { class: 'stat' }, 'Bildirim alan cihaz: ', el('b', {}, String(stats.devices))),
+    el('div', { class: 'stat' }, 'Beğenilen şiir: ', el('b', {}, String(stats.likes))), el('div', { class: 'stat' }, 'Son açtığı an: ', el('b', {}, stats.last_open ? fmtT(stats.last_open) : 'henüz açmadı'))) : '';
+}
 function poemWriteView() {
   const draft = jget('draft', { title: '', body: '' }); const editP = editing && poems.find(p => p.id === editing);
   const st = el('div', { class: 'status', role: 'status' }); const show = (m, err) => { st.className = 'status' + (err ? ' err' : ''); st.textContent = m; };
@@ -874,9 +878,7 @@ function poemWriteView() {
     manage.append(el('div', { class: 'itemrow' }, el('div', { class: 'item' }, el('span', {}, (p.liked ? '♥ ' : '') + firstLine(p)), el('span', { class: p.seen_at ? 'seen-yes' : '' }, p.seen_at ? '✓ Gördü' : 'Görmedi')),
       el('button', { class: 'mini', type: 'button', onclick: () => { editing = p.id; render(); window.scrollTo(0, 0); } }, 'Düzenle'), del)); }); }
   renderManage();
-  const statBox = stats ? el('div', { class: 'stats' }, el('div', { class: 'stat' }, 'Bildirim alan cihaz: ', el('b', {}, String(stats.devices))),
-    el('div', { class: 'stat' }, 'Beğenilen şiir: ', el('b', {}, String(stats.likes))), el('div', { class: 'stat' }, 'Son açtığı an: ', el('b', {}, stats.last_open ? fmtT(stats.last_open) : 'henüz açmadı'))) : '';
-  return el('div', { class: 'panel' }, statBox, editing ? el('strong', {}, 'Şiiri düzenliyorsun') : '',
+  return el('div', { class: 'panel' }, statBox(), editing ? el('strong', {}, 'Şiiri düzenliyorsun') : '',
     el('div', { class: 'field' }, el('label', { for: 'title' }, 'Başlık'), title), el('div', { class: 'field' }, el('label', { for: 'body' }, 'Şiir'), body, count),
     editing ? '' : el('label', { class: 'check' }, notify, 'Yayınlayınca ona bildirim gönder'),
     editing ? '' : el('div', { class: 'field' }, el('label', { for: 'nt' }, 'Bildirim başlığı (isteğe bağlı)'), nt),

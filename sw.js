@@ -1,4 +1,4 @@
-const CACHE = 'siir-v8';
+const CACHE = 'siir-v9';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
