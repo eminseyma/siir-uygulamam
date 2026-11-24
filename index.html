@@ -62,6 +62,7 @@ input[type=text],input[type=password],input[type=date],textarea{background:var(-
 textarea{min-height:200px;resize:vertical;font-family:var(--hand);font-size:1.5rem;line-height:1.35}
 textarea.short{min-height:96px;font-family:var(--body);font-size:1rem;line-height:1.5}
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.top h1::first-letter{font-size:1.3em}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .panel{display:flex;flex-direction:column;gap:16px}
 .status{min-height:1.4em;font-size:.92rem;color:var(--ok);font-weight:600}
@@ -107,9 +108,15 @@ textarea.short{min-height:96px;font-family:var(--body);font-size:1rem;line-heigh
 .bwho{font-size:.72rem;color:var(--muted);font-weight:600;margin:0 6px}
 .replies{display:flex;flex-direction:column;gap:6px}
 .nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:6;display:flex;align-items:center;gap:4px;background:var(--surface-solid);border:1.5px solid var(--line);border-radius:999px;padding:6px;box-shadow:var(--shadow)}
-.nav button{display:flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--muted);border-radius:999px;padding:9px 16px;min-height:44px;font-weight:700;font-size:.85rem}
+.nav button{position:relative;display:flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--muted);border-radius:999px;padding:9px 16px;min-height:44px;font-weight:700;font-size:.85rem}
+.navdot{position:absolute;top:4px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--rose-deep);border:1.5px solid var(--surface-solid)}
 .nav button[aria-current=page]{background:linear-gradient(135deg,var(--rose2),var(--rose));color:var(--rose-ink)}
 .nav svg{width:18px;height:18px}
+body[data-view="chat"] main{padding-bottom:210px}
+.chatbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));width:calc(100% - 36px);max-width:524px;z-index:6;display:flex;gap:8px;align-items:center;background:var(--surface-solid);border:1.5px solid var(--line);border-radius:999px;padding:7px;box-shadow:var(--shadow)}
+.chatbar input{flex:1;min-width:0;border:0;background:transparent;padding:0 14px;min-height:42px;border-radius:999px}
+.chatlist{display:flex;flex-direction:column;gap:10px}
+.chatday{text-align:center;font-size:.75rem;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:6px 0}
 .fab{position:fixed;z-index:6;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(90px + env(safe-area-inset-bottom,0px));width:60px;height:60px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--rose2),var(--rose));display:grid;place-items:center;box-shadow:0 10px 24px rgba(217,63,107,.4)}
 .fab svg{width:26px;height:26px}
 .overlay{position:fixed;inset:0;z-index:20;background:rgba(40,16,30,.5);display:flex;align-items:flex-end;justify-content:center}
@@ -297,7 +304,7 @@ const store = { get: k => { try { return localStorage.getItem(k) } catch (e) { r
 const jget = (k, d) => { try { return JSON.parse(store.get(k)) ?? d } catch (e) { return d } };
 
 let code = store.get('code'), role = store.get('role'), vapid = null, P = jget('profiles', { admin: {}, reader: {} });
-let poems = jget('poems', []), mems = jget('mems', []), offline = false, stats = null;
+let poems = jget('poems', []), mems = jget('mems', []), chats = jget('chats', []), offline = false, stats = null;
 let view = 'mems', param = null, tab = 'read', filter = 'all', ed = null, editing = null, seenPoems = new Set(jget('seen', []));
 document.documentElement.dataset.size = store.get('size') || 'm';
 
@@ -359,14 +366,14 @@ function gate(msg) {
 
 async function refreshAll() {
   try {
-    const [c, ml, pl] = await Promise.all([api('config'), api('mem_list'), api('list')]);
-    role = c.role; store.set('role', role); vapid = c.vapid_public; P = c.profiles; mems = ml.memories; poems = pl.poems; offline = false;
-    store.set('profiles', JSON.stringify(P)); store.set('poems', JSON.stringify(poems));
+    const [c, ml, pl, cl] = await Promise.all([api('config'), api('mem_list'), api('list'), api('chat_list')]);
+    role = c.role; store.set('role', role); vapid = c.vapid_public; P = c.profiles; mems = ml.memories; poems = pl.poems; chats = cl.messages; offline = false;
+    store.set('profiles', JSON.stringify(P)); store.set('poems', JSON.stringify(poems)); store.set('chats', JSON.stringify(chats));
     store.set('mems', JSON.stringify(mems.map(m => ({ ...m, photos: [] }))));
     if (role === 'admin') { try { stats = await api('stats'); } catch (e) {} }
   } catch (e) { if (e.status === 401) throw e; offline = true; }
 }
-const sig = () => JSON.stringify([mems.map(m => [m.id, m.liked, m.seen_at, m.updated_at, m.replies.length, m.photos.length]), P, poems.map(p => [p.id, p.liked, p.seen_at, p.updated_at]), offline]);
+const sig = () => JSON.stringify([mems.map(m => [m.id, m.liked, m.seen_at, m.updated_at, m.replies.length, m.photos.length]), P, poems.map(p => [p.id, p.liked, p.seen_at, p.updated_at]), chats.map(m => [m.id, m.seen_at]), offline]);
 
 async function boot() {
   if (!code) return gate();
@@ -393,19 +400,21 @@ function render() {
   document.body.dataset.view = view;
   let node;
   if (view === 'mems') node = memsView(); else if (view === 'detail') node = detailView(param); else if (view === 'editor') node = editorView();
-  else if (view === 'album') node = albumView(); else node = poemsView();
+  else if (view === 'album') node = albumView(); else if (view === 'chat') node = chatView(); else node = poemsView();
   app.replaceChildren(offline ? el('div', { class: 'offline' }, 'Çevrimdışısın. Son kaydedilenler gösteriliyor.') : '', node);
   renderChrome();
   if (view === 'poems') markPoemsSeen();
+  if (view === 'chat') { markChatSeen(); setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 0); }
   lastSig = sig();
 }
 function renderChrome() {
-  const main = ['mems', 'album', 'poems'].includes(view);
-  const items = [['mems', 'Anılar', ICON.book], ['poems', 'Şiirler', ICON.heart], ['album', 'Albüm', ICON.photo]];
+  const main = ['mems', 'album', 'poems', 'chat'].includes(view);
+  const unread = chats.filter(m => m.author === oth(role) && !m.seen_at).length;
+  const items = [['mems', 'Anılar', ICON.book], ['poems', 'Şiirler', ICON.heart], ['chat', 'Mesajlar', ICON.chat], ['album', 'Albüm', ICON.photo]];
   const nav = main ? el('nav', { class: 'nav', 'aria-label': 'Ana menü' }, items.map(([k, l, ic]) =>
-    el('button', { type: 'button', 'aria-current': view === k ? 'page' : false, onclick: () => go(k) }, svg(ic), view === k ? l : el('span', { class: 'sr', style: 'position:absolute;width:1px;height:1px;overflow:hidden' }, l)))) : '';
+    el('button', { type: 'button', 'aria-current': view === k ? 'page' : false, onclick: () => go(k) }, svg(ic), view === k ? l : el('span', { class: 'sr', style: 'position:absolute;width:1px;height:1px;overflow:hidden' }, l), k === 'chat' && unread && view !== 'chat' ? el('span', { class: 'navdot', 'aria-label': unread + ' okunmamış mesaj' }) : ''))) : '';
   const fab = view === 'mems' ? el('button', { class: 'fab', type: 'button', 'aria-label': 'Yeni anı ekle', onclick: () => startEditor(null) }, svg(ICON.plus, 'stroke="#fff" stroke-width="2.6"')) : '';
-  chrome.replaceChildren(nav, fab);
+  chrome.replaceChildren(nav, fab, view === 'chat' ? chatBar() : '');
 }
 
 /* ---------- Ortak parçalar ---------- */
@@ -492,7 +501,7 @@ function moodSheet() {
 }
 function partnerSheet(r) {
   const p = P[r] || {};
-  const av = el('div', { class: 'avatar' + (r === 'reader' ? ' b' : ''), style: 'width:88px;height:88px;font-size:2.2rem;margin:0 auto' }, photoOrInitial(r));
+  const av = el(p.photo ? 'button' : 'div', { type: p.photo ? 'button' : false, class: 'avatar' + (r === 'reader' ? ' b' : ''), style: 'width:88px;height:88px;font-size:2.2rem;margin:0 auto;border:0', 'aria-label': p.photo ? 'Fotoğrafı büyüt' : false, onclick: p.photo ? () => viewPhoto(p.photo, nameOf(r)) : false }, photoOrInitial(r));
   const rows = [
     ['Kullanıcı adı', p.username || 'Henüz yazılmamış'],
     ['Sana verdiği isim', (p.calls_other || '').trim() || 'Henüz yazılmamış'],
@@ -511,8 +520,9 @@ function profileSheet() {
   const co = el('input', { id: 'co', type: 'text', maxlength: '30', placeholder: 'Mesela: Pamuğum', value: me.calls_other || '' });
   const st = el('div', { class: 'status err', role: 'status' });
   let newPhoto = null, removePhoto = false;
-  const preview = el('div', { class: 'avatar' + (role === 'reader' ? ' b' : ''), style: 'width:88px;height:88px;font-size:2.2rem;margin:0 auto' }, me.photo ? el('img', { src: me.photo, alt: '' }) : initialOf(role));
-  const setPreview = src => preview.replaceChildren(src ? el('img', { src, alt: '' }) : initialOf(role));
+  let curPhoto = me.photo || null;
+  const preview = el('button', { type: 'button', class: 'avatar' + (role === 'reader' ? ' b' : ''), style: 'width:88px;height:88px;font-size:2.2rem;margin:0 auto;border:0', 'aria-label': 'Fotoğrafı büyüt', onclick: () => curPhoto && viewPhoto(curPhoto, nameMe()) }, curPhoto ? el('img', { src: curPhoto, alt: '' }) : initialOf(role));
+  const setPreview = src => { curPhoto = src; preview.replaceChildren(src ? el('img', { src, alt: '' }) : initialOf(role)); };
   const pfile = el('input', { id: 'pfile', type: 'file', accept: 'image/*', style: 'display:none' });
   pfile.addEventListener('change', async () => {
     const f = pfile.files[0]; pfile.value = ''; if (!f) return;
@@ -536,6 +546,13 @@ function profileSheet() {
     el('div', { class: 'field' }, el('label', { for: 'co' }, 'Ona taktığım isim'), co),
     ot.calls_other ? el('p', { class: 'muted', style: 'margin:0' }, `${ot.username || 'O'} sana “${ot.calls_other}” diye sesleniyor ♥`) : '',
     st, save, out);
+}
+function viewPhoto(src, label) {
+  if (!src) return;
+  const lb = el('div', { class: 'lb', role: 'dialog', 'aria-label': label || 'Fotoğraf', onclick: e => { if (e.target === lb) lb.remove(); } },
+    el('img', { src, alt: label || '' }),
+    el('div', { class: 'row' }, el('button', { class: 'btn ghost', type: 'button', style: 'color:#fff;border-color:rgba(255,255,255,.4);background:transparent', onclick: () => lb.remove() }, 'Kapat')));
+  document.body.append(lb);
 }
 async function lightbox(ph, mem) {
   const img = el('img', { src: ph.thumb, alt: ph.caption || 'Anı fotoğrafı' });
@@ -681,6 +698,42 @@ function albumView() {
   if (!all.length) { box.append(el('div', { class: 'empty' }, el('div', { class: 'big' }, 'Albüm henüz boş ♥'), el('div', { class: 'muted' }, 'Bir anıya fotoğraf eklediğinde burada görünür.'))); return box; }
   box.append(el('div', { class: 'grid3' }, all.map(({ p, m }) => el('button', { type: 'button', 'aria-label': memTitle(m), onclick: () => lightbox(p, m) }, el('img', { src: p.thumb, alt: p.caption || memTitle(m) })))));
   return box;
+}
+
+/* ---------- Mesajlar ---------- */
+function markChatSeen() {
+  if (document.visibilityState === 'hidden') return;
+  const unseen = chats.filter(m => m.author === oth(role) && !m.seen_at);
+  if (!unseen.length) return;
+  const now = new Date().toISOString(); unseen.forEach(m => m.seen_at = now);
+  api('chat_seen').catch(() => { unseen.forEach(m => m.seen_at = null); });
+}
+function chatDay(d) { const n = new Date(d), t = new Date();
+  const same = n.toDateString() === t.toDateString(); const y = new Date(t); y.setDate(t.getDate() - 1);
+  if (same) return 'Bugün'; if (n.toDateString() === y.toDateString()) return 'Dün';
+  return n.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }); }
+function chatView() {
+  const box = el('div', { class: 'panel' });
+  box.append(header('Mesajlarımız', 'Aklından geçeni ona yaz ♥'));
+  const list = el('div', { class: 'chatlist' });
+  if (!chats.length) list.append(el('div', { class: 'empty' }, el('div', { class: 'big' }, 'İlk mesajı sen yaz ♥'), el('div', { class: 'muted' }, 'Aşağıdan yazıp gönderebilirsin.')));
+  let curDay = '';
+  chats.forEach(m => { const d = chatDay(m.created_at); if (d !== curDay) { curDay = d; list.append(el('div', { class: 'chatday' }, d)); }
+    const me = m.author === role;
+    list.append(el('div', { style: `display:flex;flex-direction:column;gap:3px;align-items:${me ? 'flex-end' : 'flex-start'}` },
+      el('div', { class: 'bubble' + (me ? ' me' : '') }, m.body),
+      el('span', { class: 'bwho' }, `${nameOf(m.author)} · ${fmtT(m.created_at)}${me && m.seen_at ? ' · ✓ görüldü' : ''}`))); });
+  box.append(list);
+  return box;
+}
+function chatBar() {
+  const input = el('input', { id: 'chatinput', type: 'text', maxlength: '2000', placeholder: 'Bir şeyler yaz…', 'aria-label': 'Mesaj yaz' });
+  const send = el('button', { class: 'avatar b', type: 'button', 'aria-label': 'Gönder', style: 'width:40px;height:40px;border:0;flex:none' }, svg(ICON.send, 'style="width:18px;height:18px" stroke="#fff"'));
+  const doSend = async () => { const t = input.value.trim(); if (!t) return; input.value = ''; send.disabled = true;
+    try { const r = await api('chat_send', { body: t }); chats.push(r.message); store.set('chats', JSON.stringify(chats)); render(); }
+    catch (e) { input.value = t; alert(e.message); } send.disabled = false; };
+  send.onclick = doSend; input.addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
+  return el('div', { class: 'chatbar' }, input, send);
 }
 
 /* ---------- Şiirler ---------- */
