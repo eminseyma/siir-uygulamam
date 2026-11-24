@@ -715,7 +715,7 @@ function chatCard(m, latest, isNew) {
   return el('article', { class: 'poem' + (latest ? ' latest' : '') },
     el('div', { class: 'date' }, (mine ? 'Sen yazdın' : nameOf(m.author) + ' yazdı')),
     m.title ? el('h2', {}, m.title, badge) : badge,
-    el('div', { class: 'text' }, m.body), el('div', { class: 'date' }, fmt(m.created_at) + (m.updated_at ? ' · düzenlendi' : '')),
+    el('div', { class: 'text' }, m.body), el('div', { class: 'date' }, (m.note_date ? fmtDay(m.note_date) : fmt(m.created_at)) + (m.updated_at ? ' · düzenlendi' : '')),
     mine ? el('div', { class: 'seenline' + (m.seen_at ? ' yes' : '') }, m.seen_at ? '✓ Gördü · ' + fmtT(m.seen_at) : 'Henüz görmedi') : '',
     el('div', { class: 'actions' }, mine ? '' : likeBtn, copyBtn, sizeChip()));
 }
@@ -760,12 +760,13 @@ function chatWriteView() {
   nt.addEventListener('input', upd); nb.addEventListener('input', upd);
   const saveDraft = () => { if (!cediting) store.set(key, JSON.stringify({ title: title.value, body: body.value })); upd(); };
   title.addEventListener('input', saveDraft); body.addEventListener('input', saveDraft); upd();
+  const cdate = el('input', { id: 'cdate', type: 'date', max: today(), value: editM ? String(editM.note_date || editM.created_at).slice(0, 10) : today() });
   const notify = el('input', { id: 'cnotify', type: 'checkbox', checked: true });
   const pub = el('button', { class: 'btn', type: 'button' }, cediting ? 'Güncelle' : 'Gönder');
   pub.onclick = async () => { pub.disabled = true;
     try {
-      if (cediting) { await api('chat_update', { id: cediting, title: title.value, body: body.value }); cediting = null; await refreshAll(); ctab = 'read'; render(); return; }
-      const r = await api('chat_send', { title: title.value, body: body.value, notify: notify.checked, notify_title: nt.value, notify_body: nb.value });
+      if (cediting) { await api('chat_update', { id: cediting, title: title.value, body: body.value, note_date: cdate.value }); cediting = null; await refreshAll(); ctab = 'read'; render(); return; }
+      const r = await api('chat_send', { title: title.value, body: body.value, note_date: cdate.value, notify: notify.checked, notify_title: nt.value, notify_body: nb.value });
       store.del(key); title.value = ''; body.value = ''; nt.value = ''; nb.value = ''; await refreshAll(); upd(); show('Gönderildi.' + pushMsg(r.push)); renderManage();
     } catch (e) { show(e.message, true); } pub.disabled = false; };
   const mt = el('input', { id: 'cmt', type: 'text', placeholder: 'Başlık', value: '💌' });
@@ -784,6 +785,7 @@ function chatWriteView() {
   renderManage();
   return el('div', { class: 'panel' }, statBox(), cediting ? el('strong', {}, 'Yazını düzenliyorsun') : '',
     el('div', { class: 'field' }, el('label', { for: 'ctitle' }, 'Başlık'), title), el('div', { class: 'field' }, el('label', { for: 'cbody' }, 'Yazı'), body, count),
+    el('div', { class: 'field' }, el('label', { for: 'cdate' }, 'Tarih'), cdate),
     cediting ? '' : el('label', { class: 'check' }, notify, 'Gönderince ona bildirim gönder'),
     cediting ? '' : el('div', { class: 'field' }, el('label', { for: 'cnt' }, 'Bildirim başlığı (isteğe bağlı)'), nt),
     cediting ? '' : el('div', { class: 'field' }, el('label', { for: 'cnb' }, 'Bildirim metni (isteğe bağlı)'), nb),
@@ -816,7 +818,7 @@ function poemCard(p, latest, isNew) {
   const copyBtn = el('button', { class: 'chip', type: 'button', onclick: () => copyText((p.title ? p.title + '\n\n' : '') + p.body, copyBtn) }, 'Kopyala');
   return el('article', { class: 'poem' + (latest ? ' latest' : '') },
     p.title ? el('h2', {}, p.title, isNew ? el('span', { class: 'badge' }, 'Yeni') : '') : (isNew ? el('span', { class: 'badge' }, 'Yeni') : ''),
-    el('div', { class: 'text' }, p.body), el('div', { class: 'date' }, fmt(p.created_at) + (p.updated_at ? ' · düzenlendi' : '')),
+    el('div', { class: 'text' }, p.body), el('div', { class: 'date' }, (p.note_date ? fmtDay(p.note_date) : fmt(p.created_at)) + (p.updated_at ? ' · düzenlendi' : '')),
     role === 'admin' ? el('div', { class: 'seenline' + (p.seen_at ? ' yes' : '') }, p.seen_at ? '✓ Gördü · ' + fmtT(p.seen_at) : 'Henüz görmedi') : '',
     el('div', { class: 'actions' }, role === 'admin' ? '' : likeBtn, copyBtn, sizeChip()));
 }
@@ -864,12 +866,13 @@ function poemWriteView() {
     prev.replaceChildren(el('b', {}, nt.value.trim() || title.value || 'Sana bir şiir var 💌'), nb.value.trim() || body.value.trim().slice(0, 120) || 'Bildirimde şiirin ilk kısmı görünür.'); };
   const saveDraft = () => { if (!editing) store.set('draft', JSON.stringify({ title: title.value, body: body.value })); upd(); };
   title.addEventListener('input', saveDraft); body.addEventListener('input', saveDraft); nt.addEventListener('input', upd); nb.addEventListener('input', upd); upd();
+  const pdate = el('input', { id: 'pdate', type: 'date', max: today(), value: editP ? String(editP.note_date || editP.created_at).slice(0, 10) : today() });
   const notify = el('input', { id: 'notify', type: 'checkbox', checked: !editing });
   const pub = el('button', { class: 'btn', type: 'button' }, editing ? 'Güncelle' : 'Yayınla');
   pub.onclick = async () => { pub.disabled = true;
     try {
-      if (editing) { await api('update', { id: editing, title: title.value, body: body.value }); editing = null; await refreshAll(); show('Şiir güncellendi.'); render(); return; }
-      const r = await api('add', { title: title.value, body: body.value, notify: notify.checked, notify_title: nt.value, notify_body: nb.value });
+      if (editing) { await api('update', { id: editing, title: title.value, body: body.value, note_date: pdate.value }); editing = null; await refreshAll(); show('Şiir güncellendi.'); render(); return; }
+      const r = await api('add', { title: title.value, body: body.value, note_date: pdate.value, notify: notify.checked, notify_title: nt.value, notify_body: nb.value });
       store.del('draft'); title.value = ''; body.value = ''; nt.value = ''; nb.value = ''; await refreshAll(); upd(); show('Yayınlandı.' + pushMsg(r.push)); renderManage();
     } catch (e) { show(e.message, true); } pub.disabled = false; };
   const mt = el('input', { id: 'mt', type: 'text', placeholder: 'Başlık', value: '💌' });
@@ -888,6 +891,7 @@ function poemWriteView() {
   renderManage();
   return el('div', { class: 'panel' }, statBox(), editing ? el('strong', {}, 'Şiiri düzenliyorsun') : '',
     el('div', { class: 'field' }, el('label', { for: 'title' }, 'Başlık'), title), el('div', { class: 'field' }, el('label', { for: 'body' }, 'Şiir'), body, count),
+    el('div', { class: 'field' }, el('label', { for: 'pdate' }, 'Tarih'), pdate),
     editing ? '' : el('label', { class: 'check' }, notify, 'Yayınlayınca ona bildirim gönder'),
     editing ? '' : el('div', { class: 'field' }, el('label', { for: 'nt' }, 'Bildirim başlığı (isteğe bağlı)'), nt),
     editing ? '' : el('div', { class: 'field' }, el('label', { for: 'nb' }, 'Bildirim metni (isteğe bağlı)'), nb),
