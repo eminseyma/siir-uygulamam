@@ -239,6 +239,8 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
 .pfx.s{animation:pspark 1.3s ease-out forwards}
 @keyframes pnote{0%{opacity:0;transform:translate(0,0) rotate(-12deg)}20%{opacity:1}100%{opacity:0;transform:translate(var(--dx,18px),-66px) rotate(16deg)}}
 @keyframes pspark{0%{opacity:0;transform:scale(.3)}30%{opacity:1;transform:scale(1.15)}100%{opacity:0;transform:translateY(-22px) scale(.6)}}
+.crumb{position:absolute;width:5px;height:5px;border-radius:2px;pointer-events:none;animation:crumb .95s ease-in forwards}
+@keyframes crumb{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(var(--cx,10px),46px) rotate(140deg)}}
 </style>
 </head>
 <body>
@@ -1158,7 +1160,7 @@ class Pet {
       this.pose('jump');
     } else {
       if (this.mode === 'dance') { this.pose(DANCE[Math.floor(this.t / .26) % 4]); this.jy = Math.abs(Math.sin(this.t * 12)) * 5 * this.s; this.nt -= dt; if (this.nt <= 0) { this.nt = .45; this.fly('n'); } }
-      else { this.pose(POSE[this.mode] || 'sit'); if (this.mode === 'sing') { this.nt -= dt; if (this.nt <= 0) { this.nt = .6; this.fly('n'); } } }
+      else { this.pose(POSE[this.mode] || 'sit'); if (this.mode === 'eat' || this.mode === 'munch') this.jy = Math.abs(Math.sin(this.t * 10)) * 2.5 * this.s; if (this.mode === 'sing') { this.nt -= dt; if (this.nt <= 0) { this.nt = .6; this.fly('n'); } } }
       if (this.mode === 'sleep') { this.zt -= dt; if (this.zt <= 0) { this.zt = 1.6; this.fly('z'); } }
       if (this.t >= this.dur) this.next();
     }
@@ -1259,18 +1261,32 @@ class Pet {
     else if (k < .85) { this.set('jump', .7); for (let i = 0; i < 4; i++) this.fly('s'); this.say(sayFor(mood), 2600); }
     else { this.goto(...this.target()); this.say('Yakalayamazsın! 😜', 2200); }
   }
+  biteFx(sp, w0) {
+    const img = el('img', { class: 'pheld', src: sprUrl(sp), alt: '' }); this.fx.append(img);
+    let w = w0, k = 0, iv = 0;
+    const bite = () => {
+      if (!img.isConnected) { clearInterval(iv); return; }
+      w *= .78; img.style.width = w + 'px'; img.style.marginLeft = -w / 2 + 'px';
+      for (let i = 0; i < 4; i++) {
+        const c = el('span', { class: 'crumb' });
+        c.style.left = (50 + rnd(-6, 6)) + '%'; c.style.bottom = rnd(30, 42) + '%';
+        c.style.setProperty('--cx', rnd(-22, 22) + 'px');
+        c.style.background = pick(['#f08a3c', '#ffc27a', '#7cc46b', '#ffe3b0']);
+        this.fx.append(c); setTimeout(() => c.remove(), 950);
+      }
+      if (++k >= 5) { clearInterval(iv); setTimeout(() => img.remove(), 450); }
+    };
+    setTimeout(bite, 500);
+    iv = setInterval(bite, 560);
+  }
   eat(key = 'carrot') {
     const f = FOODS[key] || FOODS.carrot, sp = f[1], w = SPR[sp][0] * this.s;
     const d = el('img', { class: 'pdrop', src: sprUrl(sp), alt: '' }); d.style.width = w + 'px'; d.style.marginLeft = -w / 2 + 'px'; this.fx.append(d);
     setTimeout(() => d.remove(), 900);
-    if (key === 'carrot') this.set('eat', 3.4);
-    else {
-      this.set('munch', 3.2);
-      const h = el('img', { class: 'pheld', src: sprUrl(sp), alt: '' }); h.style.width = w * .8 + 'px'; h.style.marginLeft = -w * .4 + 'px';
-      setTimeout(() => this.fx.append(h), 800); setTimeout(() => h.remove(), 3000);
-    }
+    this.set(key === 'carrot' ? 'eat' : 'munch', 3.6);
+    this.biteFx(sp, w * .9);
     setTimeout(() => this.burst(4), 1200);
-    setTimeout(() => { if (this.mode !== 'held' && !isSleeping()) { this.set('dance', 2.4); this.say(FOOD_SAY[key] || 'Nefis! 😋', 2600); } }, 3500);
+    setTimeout(() => { if (this.mode !== 'held' && !isSleeping()) { this.set('dance', 2.4); this.say(FOOD_SAY[key] || 'Nefis! 😋', 2600); } }, 3700);
   }
   love() { this.set('sing', 3); this.burst(8); this.say(pick(LOVE_LINES), 2800); }
 }
