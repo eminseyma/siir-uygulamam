@@ -1,4 +1,4 @@
-const CACHE = 'siir-v15';
+const CACHE = 'siir-v16';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'apple-touch-icon.png', 'bunny/bed.png', 'bunny/food_apple.png', 'bunny/food_broccoli.png', 'bunny/food_cucumber.png', 'bunny/food_hay.png', 'bunny/food_lettuce.png', 'bunny/food_strawberry.png', 'bunny/back.png', 'bunny/carrot.png', 'bunny/carrot_item.png', 'bunny/f_angry.png', 'bunny/f_cry.png', 'bunny/f_happy.png', 'bunny/f_love.png', 'bunny/f_neutral.png', 'bunny/f_surprised.png', 'bunny/front.png', 'bunny/jump.png', 'bunny/peek.png', 'bunny/sing.png', 'bunny/sit.png', 'bunny/sleep.png', 'bunny/walk0.png', 'bunny/walk1.png', 'bunny/walk2.png', 'bunny/walk3.png'];
 
 self.addEventListener('install', e => {

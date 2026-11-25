@@ -235,6 +235,10 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
 .krow{display:flex;align-items:center;gap:10px;justify-content:space-between}
 .krow .kn{font-weight:700}.kneg{color:var(--rose-deep);font-size:1.1rem}
 .kbank .chip{min-height:38px;padding:6px 14px}
+.pfx.n{color:var(--lav);font-size:17px;animation:pnote 1.7s ease-out forwards}
+.pfx.s{animation:pspark 1.3s ease-out forwards}
+@keyframes pnote{0%{opacity:0;transform:translate(0,0) rotate(-12deg)}20%{opacity:1}100%{opacity:0;transform:translate(var(--dx,18px),-66px) rotate(16deg)}}
+@keyframes pspark{0%{opacity:0;transform:scale(.3)}30%{opacity:1;transform:scale(1.15)}100%{opacity:0;transform:translateY(-22px) scale(.6)}}
 </style>
 </head>
 <body>
@@ -996,7 +1000,7 @@ const curVal = k => !bunny ? 70 : Math.max(0, Math.min(100, (bunny[k] == null ? 
 const isSleeping = () => !!bunny && !!bunny.sleeping && curVal('energy') < 100;
 const FOODS = { carrot: ['Havuç', 'carrot_item', '🥕', 30], lettuce: ['Marul', 'food_lettuce', '🥬', 22], apple: ['Elma', 'food_apple', '🍎', 25], broccoli: ['Brokoli', 'food_broccoli', '🥦', 22], cucumber: ['Salatalık', 'food_cucumber', '🥒', 18], hay: ['Kuru ot', 'food_hay', '🌾', 15], strawberry: ['Çilek', 'food_strawberry', '🍓', 8] };
 const BED_LIFT = 22;
-function setBunny(b) { bunny = { ...b, at: Date.now() }; paintBunny(); }
+function setBunny(b) { bunny = { ...b, at: Date.now() }; paintBunny(); syncPetLayer(); }
 async function refreshBunny() { if (!code || !role) return; try { setBunny((await bapi('get')).bunny); } catch (e) {} }
 const bName = () => (bunny && bunny.name) || 'Tavşanımız';
 const isNight = () => { const h = new Date().getHours(); return h >= 23 || h < 7; };
@@ -1019,6 +1023,20 @@ const LINES = {
   ok: ['Merhaba!', 'Bir şiir okuyalım mı?', 'Beni sever misin?', 'Anne ve babamı çok seviyorum!', 'Şeyma\'yı çok seviyorum ♥'],
 };
 const LOVE_LINES = ['Kalbim kıpır kıpır ♥', 'Bir tanesin!', 'Çok sevildim!', 'Yine mi? Hiç bırakma!'];
+LINES.ok.push('Havuç mu var?', 'Biraz zıplayayım mı?', 'Beni fark ettin!', 'Gel oynayalım!', 'Bugün neler yaptınız?');
+LINES.happy.push('Hop hop hop!', 'Dans edelim mi? 💃', 'Dünyanın en şanslı tavşanıyım!', 'Bana bak, bana bak!', 'Siz varsınız ya, her şey güzel ♥');
+const TICKLE = ['Hihihi, gıdıklanıyorum! 😆', 'Dur dur, gülmekten öleceğim!', 'Hahaha yapma ya! 🤭'];
+const SULK_TAP = ['Hmph! Küsüm… 😤', 'Önce okşa, sonra konuşuruz.', 'Bana bakma!'];
+const HUNGRY_TAP = ['Karnım guruldadı, duydun mu? 😣', 'Havuç… havuç… 🥕', 'Bir şeyler yesem iyi olacak…'];
+const DANCE_SAY = ['Dans zamanı! 💃', 'La la laa ♪', 'Bak nasıl dönüyorum!'];
+const CHEER = ['Yaşasın! 🎉', 'Hoplaaa!', 'Çok eğleniyorum!'];
+const FOOD_SAY = { carrot: 'Havuç en sevdiğim! 🥕', lettuce: 'Çıtır çıtır marul 🥬', apple: 'Tatlı elma, bayıldım! 🍎', broccoli: 'Brokoli de güzelmiş 🥦', cucumber: 'Ne serinletti! 🥒', hay: 'Kuru ot, klasik! 🌾', strawberry: 'Çilek! Bayıldım! 🍓' };
+const DANCE = ['front', 'sing', 'back', 'sing'];
+const sayFor = mood => {
+  const h = new Date().getHours();
+  if ((mood === 'ok' || mood === 'happy') && Math.random() < .25) return h < 11 ? 'Günaydın! ☀️' : h >= 18 ? 'İyi akşamlar 🌙 Bugün nasıldı?' : 'Bir şeyler yedin mi? 🍽️';
+  return pick(LINES[mood]);
+};
 
 /* ---- Gezinen tavşan ---- */
 const pets = new Set(); let petRaf = 0, petLast = 0, petAcc = 0;
@@ -1027,7 +1045,7 @@ class Pet {
     this.host = host; this.s = o.s || 1; this.onTap = o.onTap; this.moodFn = o.mood; this.peekOK = !!o.peek; this.onIdle = o.onIdle; this.onStroke = o.onStroke;
     this.free = !!o.free; this.speed = o.speed || 30;
     this.x = 0; this.y = 0; this.tx = 0; this.ty = 0; this.dir = 1; this.mode = 'sit'; this.t = 0; this.dur = 2; this.ft = 0; this.fr = 0; this.jy = 0; this.spd = 1;
-    this.after = null; this.awake = 0; this.zt = 0; this.cur = 'sit'; this.pt = null; this.sc = 0; this.lift = 0; this.held = false; this.bedFn = o.bed; this.drag = o.drag;
+    this.after = null; this.awake = 0; this.zt = 0; this.cur = 'sit'; this.pt = null; this.sc = 0; this.lift = 0; this.held = false; this.nt = 0; this.jn = 0; this.taps = []; this.born = Date.now(); this.bedFn = o.bed; this.drag = o.drag;
     this.el = el('div', { class: 'pet' + (this.free ? ' free' : ''), role: 'button', tabindex: '0', 'aria-label': 'Tavşanla ilgilen' });
     this.sh = el('i', { class: 'pet-shadow' });
     this.img = el('img', { alt: '', draggable: 'false' });
@@ -1042,6 +1060,7 @@ class Pet {
     host.append(this.el);
     this.x = this.W() * rnd(.25, .75);
     this.y = this.free ? rnd(this.minY(), this.maxY()) : 0;
+    if (this.bedFn && isSleeping()) { this.x = this.bedFn(); this.lift = BED_LIFT; }
     this.pose('sit'); this.next(); this.draw();
     pets.add(this); startPets();
   }
@@ -1075,7 +1094,7 @@ class Pet {
     const mood = this.mood(), W = this.W(), r = Math.random();
     if (mood === 'sleep') {
       const bx = this.bedFn && this.bedFn();
-      if (bx != null && Math.abs(this.x - bx) > 6 && !REDUCE) { this.lift = 0; return this.goto(bx, this.y); }
+      if (bx != null && Math.abs(this.x - bx) > 6 && !REDUCE && Date.now() - this.born > 4000) { this.lift = 0; return this.goto(bx, this.y); }
       if (bx != null) { this.x = bx; this.lift = BED_LIFT; }
       return this.set('sleep', 20);
     }
@@ -1084,12 +1103,15 @@ class Pet {
     this.spd = (mood === 'hungry' || mood === 'sulk' || mood === 'sleepy') ? .6 : 1;
     if (this.onIdle) this.onIdle(this, mood);
     if (mood === 'hungry' || mood === 'sulk' || mood === 'sleepy') return r < .45 ? this.goto(...this.target()) : this.set('sit', rnd(3, 6));
-    if (r < .50) return this.goto(...this.target());
-    if (r < .64) return this.set('sit', rnd(2.5, 5));
-    if (r < .73) return this.set('front', rnd(2, 4));
-    if (r < .79) return this.set('back', rnd(2, 3.5));
-    if (r < .88) { this.dir = Math.random() < .5 ? -1 : 1; return this.set('jump', .7); }
-    if (r < .94) return this.set(mood === 'happy' ? 'sing' : 'sit', rnd(2.5, 4));
+    if (r < .38) return this.goto(...this.target());
+    if (r < .48) return this.set('sit', rnd(2.5, 5));
+    if (r < .54) return this.set('front', rnd(2, 4));
+    if (r < .58) return this.set('back', rnd(2, 3.5));
+    if (r < .66) { this.dir = Math.random() < .5 ? -1 : 1; this.set('jump', .7); this.jn = Math.floor(rnd(0, 3)); return; }
+    if (r < .72) { this.set('sing', rnd(2.5, 4)); return; }
+    if (r < .79) return this.set(mood === 'happy' || mood === 'ok' ? 'dance' : 'sit', rnd(2.2, 3.4));
+    if (r < .85) { this.goto(...this.target()); this.spd = 2.4; return; }
+    if (r < .90) { this.set('sit', rnd(2, 3)); for (let i = 0; i < 3; i++) setTimeout(() => this.fly('s'), i * 300); return; }
     if (this.peekOK) return this.goto(Math.random() < .5 ? 0 : W, this.free ? rnd(this.minY(), this.maxY()) : this.y, 'peek');
     return this.set('sit', 3);
   }
@@ -1112,11 +1134,12 @@ class Pet {
     } else if (this.mode === 'jump') {
       const p = Math.min(1, this.t / this.dur);
       this.jy = Math.sin(p * Math.PI) * 18 * this.s; this.x += this.dir * 16 * this.s * dt; this.pose('jump');
-      if (p >= 1) { this.jy = 0; this.next(); }
+      if (p >= 1) { this.jy = 0; if (this.jn > 0) { this.jn--; this.t = 0; } else this.next(); }
     } else if (this.mode === 'held') {
       this.pose('jump');
     } else {
-      this.pose(POSE[this.mode] || 'sit');
+      if (this.mode === 'dance') { this.pose(DANCE[Math.floor(this.t / .26) % 4]); this.jy = Math.abs(Math.sin(this.t * 12)) * 5 * this.s; this.nt -= dt; if (this.nt <= 0) { this.nt = .45; this.fly('n'); } }
+      else { this.pose(POSE[this.mode] || 'sit'); if (this.mode === 'sing') { this.nt -= dt; if (this.nt <= 0) { this.nt = .6; this.fly('n'); } } }
       if (this.mode === 'sleep') { this.zt -= dt; if (this.zt <= 0) { this.zt = 1.6; this.fly('z'); } }
       if (this.t >= this.dur) this.next();
     }
@@ -1140,7 +1163,7 @@ class Pet {
   }
   grab() {
     const p = this.pt; if (!p || p.stroked || Math.hypot(p.x - p.sx, p.y - p.sy) > 10) return;
-    this.held = true; p.d = 999; this.el.classList.add('held'); this.set('held', 9999); this.pose('jump');
+    this.say('Uçuyorum!! 🤩', 1800); this.held = true; p.d = 999; this.el.classList.add('held'); this.set('held', 9999); this.pose('jump');
     if (navigator.vibrate) try { navigator.vibrate(18); } catch (_) {}
     this.moveTo(p.x, p.y);
   }
@@ -1187,10 +1210,12 @@ class Pet {
     if (this.onStroke) this.onStroke(this);
   }
   fly(kind) {
-    const z = kind === 'z', w = this.hw() * 2;
-    const n = el('span', { class: 'pfx ' + (z ? 'z' : 'h') }, z ? 'z' : '♥');
-    n.style.left = (z ? w * .75 : rnd(w * .15, w * .85)) + 'px';
-    if (!z) { n.style.fontSize = rnd(12, 20) + 'px'; n.style.animationDelay = rnd(0, .35) + 's'; }
+    const w = this.hw() * 2, z = kind === 'z';
+    const n = el('span', { class: 'pfx ' + kind }, z ? 'z' : kind === 'n' ? pick(['♪', '♫']) : kind === 's' ? '✨' : '♥');
+    n.style.left = (z ? w * .75 : rnd(w * .1, w * .9)) + 'px';
+    if (kind === 'h') { n.style.fontSize = rnd(12, 20) + 'px'; n.style.animationDelay = rnd(0, .35) + 's'; }
+    if (kind === 'n') n.style.setProperty('--dx', rnd(-26, 26) + 'px');
+    if (kind === 's') { n.style.fontSize = rnd(12, 18) + 'px'; n.style.bottom = rnd(30, 95) + '%'; }
     this.fx.append(n); setTimeout(() => n.remove(), 2800);
   }
   burst(k = 5) { for (let i = 0; i < k; i++) this.fly('h'); }
@@ -1202,7 +1227,19 @@ class Pet {
     b.dataset.pos = this.x < 110 ? 'l' : (this.x > W - 110 ? 'r' : 'c');
     this._bt = setTimeout(() => { b.hidden = true; }, ms);
   }
-  wake() { this.awake = Date.now() + 9000; this.lift = 0; this.set('front', 3.5); }
+  wake() { this.awake = Date.now() + 9000; this.lift = 0; this.set('jump', .7); this.jn = 1; this.burst(3); this.fly('s'); }
+  react(mood) {
+    const now = Date.now(); this.taps = this.taps.filter(t => now - t < 2600); this.taps.push(now);
+    if (this.taps.length >= 4) { this.taps = []; this.set('jump', .45); this.jn = 4; this.burst(5); this.say(pick(TICKLE), 2600); return; }
+    if (mood === 'sulk') { this.set('back', 2.6); this.say(pick(SULK_TAP), 2600); return; }
+    if (mood === 'hungry') { this.set('jump', .5); this.jn = 1; this.say(pick(HUNGRY_TAP), 2800); return; }
+    const k = Math.random();
+    if (k < .25) { this.set('jump', .7); this.jn = 2; this.burst(4); this.say(pick(CHEER), 2200); }
+    else if (k < .5) { this.set('dance', 2.6); this.say(pick(DANCE_SAY), 2400); }
+    else if (k < .7) { this.set('sing', 2.8); this.burst(3); this.say(pick(LINES.happy), 2600); }
+    else if (k < .85) { this.set('jump', .7); for (let i = 0; i < 4; i++) this.fly('s'); this.say(sayFor(mood), 2600); }
+    else { this.goto(...this.target()); this.spd = 2.4; this.say('Yakalayamazsın! 😜', 2200); }
+  }
   eat(key = 'carrot') {
     const f = FOODS[key] || FOODS.carrot, sp = f[1], w = SPR[sp][0] * this.s;
     const d = el('img', { class: 'pdrop', src: sprUrl(sp), alt: '' }); d.style.width = w + 'px'; d.style.marginLeft = -w / 2 + 'px'; this.fx.append(d);
@@ -1214,6 +1251,7 @@ class Pet {
       setTimeout(() => this.fx.append(h), 800); setTimeout(() => h.remove(), 3000);
     }
     setTimeout(() => this.burst(4), 1200);
+    setTimeout(() => { if (this.mode !== 'held' && !isSleeping()) { this.set('dance', 2.4); this.say(FOOD_SAY[key] || 'Nefis! 😋', 2600); } }, 3500);
   }
   love() { this.set('sing', 3); this.burst(8); this.say(pick(LOVE_LINES), 2800); }
 }
@@ -1265,23 +1303,22 @@ function unreadTarget() {
 let petLayer = null, lastNudge = 0;
 function layerTap(p) {
   const mood = bunnyMood();
-  if (mood === 'sleep') { p.wake(); p.say('Zzz… çok uykum var 🥱', 2800); return; }
+  if (mood === 'sleep') { p.burst(2); p.say(pick(['Zzz… ♥', 'Mmm… beş dakika daha…', 'Zzz… havuç…']), 2400); return; }
   if (mood === 'sleepy') { p.say(pick(LINES.sleepy), 4500, () => go('bunny')); return; }
-  p.burst(4); petIt(12000);
+  p.burst(4); petIt(12000); p.react(mood);
   const u = unreadTarget();
   if (u) p.say(u.text, 4500, () => go(u.view));
   else if (mood === 'hungry') p.say(pick(LINES.hungry), 4500, () => go('bunny'));
-  else p.say(pick(LINES[mood]), 3000);
 }
 function layerIdle(p, mood) {
   if (!p.bub.hidden) return;
   const u = unreadTarget();
   if (u && Date.now() - lastNudge > 90000) { lastNudge = Date.now(); p.say(u.text, 4500, () => go(u.view)); return; }
-  if (Math.random() < .12) p.say(pick(LINES[mood]), 2800, (mood === 'hungry' || mood === 'sleepy') ? () => go('bunny') : null);
+  if (Math.random() < .12) p.say(sayFor(mood), 2800, (mood === 'hungry' || mood === 'sleepy') ? () => go('bunny') : null);
 }
 function syncPetLayer() {
   if (!code || !role) return;
-  const show = view !== 'bunny';
+  const show = view !== 'bunny' && !isSleeping();
   if (!petLayer && show) {
     petLayer = el('div', { id: 'pet-layer' }); document.body.append(petLayer);
     Object.keys(SPR).forEach(n => { const i = new Image(); i.src = sprUrl(n); });
@@ -1294,9 +1331,8 @@ function syncPetLayer() {
 function stageTap(p) {
   const mood = bunnyMood();
   if (mood === 'sleepy') { p.say(pick(LINES.sleepy), 2800); return; }
-  if (mood === 'sleep') { p.wake(); p.say('Zzz… çok uykum var 🥱', 2800); return; }
-  p.burst(5); petIt(12000);
-  p.say(pick(LINES[mood]), 2800);
+  if (mood === 'sleep') { p.burst(2); p.say(pick(['Zzz… ♥', 'Mmm… beş dakika daha…', 'Zzz… havuç…']), 2400); return; }
+  p.burst(5); petIt(12000); p.react(mood);
 }
 function renameSheet() {
   const inp = el('input', { id: 'bname', type: 'text', maxlength: '24', placeholder: 'Mesela: Pamuk', value: (bunny && bunny.name) || '' });
@@ -1335,8 +1371,9 @@ function paintBunny() {
   u.fF.classList.toggle('low', f < 25); u.fL.classList.toggle('low', l < 25);
   u.vF.textContent = foodWord(f); u.vL.textContent = loveWord(l);
   const fn = FACE[mood]; if (u.face.dataset.n !== fn) { u.face.dataset.n = fn; u.face.src = sprUrl(fn); u.face.style.width = SPR[fn][0] * 2 + 'px'; u.face.style.height = SPR[fn][1] * 2 + 'px'; }
-  if (u.mood !== mood) { u.mood = mood; u.say.textContent = pick(LINES[mood]); }
+  if (u.mood !== mood) { u.mood = mood; u.say.textContent = sayFor(mood); }
   u.title.textContent = bName();
+  if (u.pet && u.pet.lastMood !== mood) { if (mood === 'sleep') u.pet.set('sit', .05); u.pet.lastMood = mood; }
   if (!bunny) return;
   if (bunny.name) u.nameSlot.replaceChildren(); else if (!u.nameSlot.firstChild) u.nameSlot.append(nameCard());
   u.info.replaceChildren(
@@ -1438,7 +1475,7 @@ function bunnyView() {
   };
   love.onclick = async () => {
     const p = me.pet; if (!p) return;
-    if (bunnyMood() === 'sleep') { p.wake(); p.say('Zzz… çok uykum var 🥱', 2800); return; }
+    if (bunnyMood() === 'sleep') { p.burst(2); p.say(pick(['Zzz… ♥', 'Mmm… beş dakika daha…', 'Zzz… havuç…']), 2400); return; }
     p.love();
     const r = await petIt(8500);
     if (r === null) note('Şu an ulaşılamadı, biraz sonra tekrar dene.', true); else note('');
@@ -1449,7 +1486,7 @@ function bunnyView() {
   if (!bunny) refreshBunny();
   const timer = setInterval(() => { if (!box.isConnected) clearInterval(timer); else paintBunny(); }, 30000);
   queueMicrotask(() => { paintBunny(); if (host.isConnected) me.pet = new Pet(host, { s: 2, onTap: stageTap, bed: () => bed.offsetLeft + bed.offsetWidth / 2,
-    drag: { bedEl: () => bed, bedX: () => bed.offsetLeft + bed.offsetWidth / 2, over: v => bed.classList.toggle('over', v), drop: () => putToBed(true) }, onStroke: strokeBunny, mood: bunnyMood, onIdle: (p, mood) => { if (p.bub.hidden && Math.random() < .15) p.say(pick(LINES[mood]), 2800); } }); });
+    drag: { bedEl: () => bed, bedX: () => bed.offsetLeft + bed.offsetWidth / 2, over: v => bed.classList.toggle('over', v), drop: () => putToBed(true) }, onStroke: strokeBunny, mood: bunnyMood, onIdle: (p, mood) => { if (p.bub.hidden && Math.random() < .15) p.say(sayFor(mood), 2800); } }); });
   return box;
 }
 
