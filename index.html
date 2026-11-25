@@ -218,6 +218,23 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
 .bbtns .btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .bbtns .btn img{height:22px;image-rendering:pixelated}
 .binfo{display:flex;flex-direction:column;gap:6px;font-size:.92rem;font-weight:600}
+.fill.zz{background:linear-gradient(90deg,#cdb8ff,#9b7fe0)}
+.bbtns{flex-wrap:wrap}.bbtns .btn{min-width:30%;padding-left:8px;padding-right:8px;white-space:nowrap}.bbtns .btn img{height:18px}
+.bed{position:absolute;right:10px;bottom:14px;width:176px;image-rendering:pixelated;pointer-events:none;transition:filter .2s,transform .2s}
+.bed.over{filter:brightness(1.08) drop-shadow(0 0 8px var(--lav));transform:scale(1.04)}
+.pet.held{cursor:grabbing;z-index:3}
+.pet.held .pet-shadow{display:none}
+.pheld{position:absolute;left:50%;bottom:26%;image-rendering:pixelated;animation:munch .35s ease-in-out infinite alternate}
+@keyframes munch{from{transform:translateY(0) rotate(-4deg)}to{transform:translateY(-3px) rotate(4deg)}}
+.foods{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 4px}
+.food{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--surface-solid);border:1.5px solid var(--line);border-radius:18px;padding:12px 6px;font-weight:700;color:var(--ink);min-height:96px;justify-content:center}
+.food img{height:34px;width:auto;image-rendering:pixelated}
+.food small{color:var(--muted);font-weight:600;font-size:.72rem}
+.kbank{background:var(--surface);border:1.5px solid var(--line);border-radius:28px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+.kbank h3{margin:0;font-size:1.05rem}
+.krow{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.krow .kn{font-weight:700}.kneg{color:var(--rose-deep);font-size:1.1rem}
+.kbank .chip{min-height:38px;padding:6px 14px}
 </style>
 </head>
 <body>
@@ -964,32 +981,38 @@ async function bapi(action, extra = {}) {
   return j;
 }
 /* sprite boyutları [genişlik, yükseklik] — dosyalar bunny/ klasöründe */
-const SPR = {back:[39,70],carrot:[40,59],carrot_item:[24,33],f_angry:[46,60],f_cry:[42,58],f_happy:[42,53],f_love:[39,52],f_neutral:[42,54],f_surprised:[41,53],front:[42,75],jump:[51,57],peek:[26,75],sing:[39,67],sit:[49,66],sleep:[77,50],walk0:[53,70],walk1:[53,67],walk2:[51,69],walk3:[51,68]};
+const SPR = {back:[39,70],carrot:[40,59],carrot_item:[24,33],f_angry:[46,60],f_cry:[42,58],f_happy:[42,53],f_love:[39,52],f_neutral:[42,54],f_surprised:[41,53],front:[42,75],jump:[51,57],peek:[26,75],sing:[39,67],sit:[49,66],sleep:[77,50],walk0:[53,70],walk1:[53,67],walk2:[51,69],walk3:[51,68],bed:[90,32],food_apple:[26,28],food_broccoli:[28,30],food_cucumber:[34,16],food_hay:[30,24],food_lettuce:[28,26],food_strawberry:[22,26]};
 const sprUrl = n => `bunny/${n}.png`;
 const FLIPS = new Set(['walk0', 'walk1', 'walk2', 'walk3', 'jump', 'sit', 'peek']); /* sağa bakan çizimler */
-const POSE = { sit: 'sit', front: 'front', back: 'back', sing: 'sing', eat: 'carrot', peek: 'peek', sleep: 'sleep' };
+const POSE = { sit: 'sit', front: 'front', back: 'back', sing: 'sing', eat: 'carrot', peek: 'peek', sleep: 'sleep', munch: 'sit' };
 const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[Math.floor(Math.random() * a.length)];
 
 /* ortak durum (sunucudan gelir, zamanla kendiliğinden azalır) */
 let bunny = null, bui = null;
-const curVal = k => !bunny ? 70 : Math.max(0, Math.min(100, bunny[k] - bunny.rates[k] * (Date.now() - bunny.at) / 3.6e6));
+const bRate = k => k === 'energy' ? (bunny.sleeping ? -bunny.rates.energy_sleep : bunny.rates.energy_awake) : bunny.rates[k];
+const curVal = k => !bunny ? 70 : Math.max(0, Math.min(100, (bunny[k] == null ? 80 : bunny[k]) - bRate(k) * (Date.now() - bunny.at) / 3.6e6));
+const isSleeping = () => !!bunny && !!bunny.sleeping && curVal('energy') < 100;
+const FOODS = { carrot: ['Havuç', 'carrot_item', '🥕', 30], lettuce: ['Marul', 'food_lettuce', '🥬', 22], apple: ['Elma', 'food_apple', '🍎', 25], broccoli: ['Brokoli', 'food_broccoli', '🥦', 22], cucumber: ['Salatalık', 'food_cucumber', '🥒', 18], hay: ['Kuru ot', 'food_hay', '🌾', 15], strawberry: ['Çilek', 'food_strawberry', '🍓', 8] };
+const BED_LIFT = 22;
 function setBunny(b) { bunny = { ...b, at: Date.now() }; paintBunny(); }
 async function refreshBunny() { if (!code || !role) return; try { setBunny((await bapi('get')).bunny); } catch (e) {} }
 const bName = () => (bunny && bunny.name) || 'Tavşanımız';
 const isNight = () => { const h = new Date().getHours(); return h >= 23 || h < 7; };
 function bunnyMood() {
-  if (isNight()) return 'sleep';
+  if (isSleeping()) return 'sleep';
   const f = curVal('food'), l = curVal('love');
   if (f < 20) return 'hungry';
   if (l < 20) return 'sulk';
+  if (curVal('energy') < 20) return 'sleepy';
   if (f > 60 && l > 60) return 'happy';
   return 'ok';
 }
-const FACE = { sleep: 'f_happy', hungry: 'f_cry', sulk: 'f_angry', happy: 'f_happy', ok: 'f_neutral' };
+const FACE = { sleepy: 'f_neutral', sleep: 'f_happy', hungry: 'f_cry', sulk: 'f_angry', happy: 'f_happy', ok: 'f_neutral' };
 const LINES = {
   sleep: ['Zzz… sessiz, uyuyorum.', 'Rüyamda havuç tarlası var…'],
+  sleepy: ['Gözlerim kapanıyor… 🥱', 'Beni yatağıma yatırır mısın?', 'Çok uykum geldi…'],
   hungry: ['Karnım gurulduyor…', 'Bir havuç alabilir miyim?', 'Çok acıktım…'],
   sulk: ['Beni biraz seversen barışırım.', 'Kimse benimle ilgilenmiyor…'],
   happy: ['Sizi çok seviyorum!', 'Bugün çok mutluyum ♥', 'Bu defterin en tatlısı benim.', 'İkinizi birlikte görmek çok güzel!', 'Anne ve babamı çok seviyorum!', 'Şeyma\'yı çok seviyorum ♥'],
@@ -1004,7 +1027,7 @@ class Pet {
     this.host = host; this.s = o.s || 1; this.onTap = o.onTap; this.moodFn = o.mood; this.peekOK = !!o.peek; this.onIdle = o.onIdle; this.onStroke = o.onStroke;
     this.free = !!o.free; this.speed = o.speed || 30;
     this.x = 0; this.y = 0; this.tx = 0; this.ty = 0; this.dir = 1; this.mode = 'sit'; this.t = 0; this.dur = 2; this.ft = 0; this.fr = 0; this.jy = 0; this.spd = 1;
-    this.after = null; this.awake = 0; this.zt = 0; this.cur = 'sit'; this.pt = null; this.sc = 0;
+    this.after = null; this.awake = 0; this.zt = 0; this.cur = 'sit'; this.pt = null; this.sc = 0; this.lift = 0; this.held = false; this.bedFn = o.bed; this.drag = o.drag;
     this.el = el('div', { class: 'pet' + (this.free ? ' free' : ''), role: 'button', tabindex: '0', 'aria-label': 'Tavşanla ilgilen' });
     this.sh = el('i', { class: 'pet-shadow' });
     this.img = el('img', { alt: '', draggable: 'false' });
@@ -1036,7 +1059,7 @@ class Pet {
   set(mode, dur) { this.mode = mode; this.t = 0; this.dur = dur; this.ft = 0; this.jy = 0; }
   mood() { return Date.now() < this.awake ? 'ok' : (this.moodFn ? this.moodFn() : 'ok'); }
   goto(x, y, then) {
-    const m = this.hw() + 6, W = this.W();
+    const m = this.hw() + 6, W = this.W(); this.lift = 0;
     this.tx = Math.max(m, Math.min(W - m, x));
     this.ty = this.free ? Math.max(this.minY(), Math.min(this.maxY(), y)) : this.y;
     this.after = then || null;
@@ -1050,11 +1073,17 @@ class Pet {
   }
   next() {
     const mood = this.mood(), W = this.W(), r = Math.random();
-    if (REDUCE) return this.set(mood === 'sleep' ? 'sleep' : 'sit', 20);
-    if (mood === 'sleep') return this.set('sleep', 20);
-    this.spd = (mood === 'hungry' || mood === 'sulk') ? .6 : 1;
+    if (mood === 'sleep') {
+      const bx = this.bedFn && this.bedFn();
+      if (bx != null && Math.abs(this.x - bx) > 6 && !REDUCE) { this.lift = 0; return this.goto(bx, this.y); }
+      if (bx != null) { this.x = bx; this.lift = BED_LIFT; }
+      return this.set('sleep', 20);
+    }
+    this.lift = 0;
+    if (REDUCE) return this.set('sit', 20);
+    this.spd = (mood === 'hungry' || mood === 'sulk' || mood === 'sleepy') ? .6 : 1;
     if (this.onIdle) this.onIdle(this, mood);
-    if (mood === 'hungry' || mood === 'sulk') return r < .45 ? this.goto(...this.target()) : this.set('sit', rnd(3, 6));
+    if (mood === 'hungry' || mood === 'sulk' || mood === 'sleepy') return r < .45 ? this.goto(...this.target()) : this.set('sit', rnd(3, 6));
     if (r < .50) return this.goto(...this.target());
     if (r < .64) return this.set('sit', rnd(2.5, 5));
     if (r < .73) return this.set('front', rnd(2, 4));
@@ -1084,6 +1113,8 @@ class Pet {
       const p = Math.min(1, this.t / this.dur);
       this.jy = Math.sin(p * Math.PI) * 18 * this.s; this.x += this.dir * 16 * this.s * dt; this.pose('jump');
       if (p >= 1) { this.jy = 0; this.next(); }
+    } else if (this.mode === 'held') {
+      this.pose('jump');
     } else {
       this.pose(POSE[this.mode] || 'sit');
       if (this.mode === 'sleep') { this.zt -= dt; if (this.zt <= 0) { this.zt = 1.6; this.fly('z'); } }
@@ -1097,25 +1128,53 @@ class Pet {
     const gx = (this.x - this.hw()).toFixed(1);
     this.el.style.transform = this.free ? `translate3d(${gx}px,${(this.y - SPR[this.cur][1] * this.s).toFixed(1)}px,0)` : `translate3d(${gx}px,0,0)`;
     const f = FLIPS.has(this.cur) && this.dir < 0 ? -1 : 1;
-    this.img.style.transform = `translateY(${(-this.jy).toFixed(1)}px) scaleX(${f})`;
+    this.img.style.transform = `translateY(${(-this.jy - this.lift).toFixed(1)}px) scaleX(${f})`;
+    this.sh.style.display = this.lift > 1 ? 'none' : '';
   }
   /* parmakla okşama: tavşanın üzerinde parmağı gezdirince kalp çıkar, sevgi artar */
   pDown(e) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    this.pt = { x: e.clientX, y: e.clientY, d: 0, acc: 0, stroked: false };
+    this.pt = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, d: 0, acc: 0, stroked: false };
     try { this.el.setPointerCapture(e.pointerId); } catch (_) {}
+    if (this.drag) { clearTimeout(this._lp); this._lp = setTimeout(() => this.grab(), 400); }
+  }
+  grab() {
+    const p = this.pt; if (!p || p.stroked || Math.hypot(p.x - p.sx, p.y - p.sy) > 10) return;
+    this.held = true; p.d = 999; this.el.classList.add('held'); this.set('held', 9999); this.pose('jump');
+    if (navigator.vibrate) try { navigator.vibrate(18); } catch (_) {}
+    this.moveTo(p.x, p.y);
+  }
+  moveTo(cx, cy) {
+    const r = this.host.getBoundingClientRect();
+    this.x = Math.max(this.hw(), Math.min(this.W() - this.hw(), cx - r.left));
+    this.lift = Math.max(0, Math.min(r.height - 20, r.bottom - cy - 40));
+    this.drag.over(this.overBed(cx, cy)); this.draw();
+  }
+  overBed(cx, cy) {
+    const b = this.drag.bedEl(); if (!b) return false; const r = b.getBoundingClientRect(), m = 22;
+    return cx > r.left - m && cx < r.right + m && cy > r.top - m - 30 && cy < r.bottom + m;
   }
   pMove(e) {
     const p = this.pt; if (!p) return;
     const seg = Math.hypot(e.clientX - p.x, e.clientY - p.y); p.x = e.clientX; p.y = e.clientY; p.d += seg;
+    if (this.held) { this.moveTo(e.clientX, e.clientY); return; }
+    if (Math.hypot(p.x - p.sx, p.y - p.sy) > 10) clearTimeout(this._lp);
     const r = this.el.getBoundingClientRect(), m = 14;
     if (e.clientX < r.left - m || e.clientX > r.right + m || e.clientY < r.top - m || e.clientY > r.bottom + m) return;
     p.acc += seg;
     if (p.acc >= 55) { p.acc -= 55; p.stroked = true; this.stroke(); }
   }
   pUp(e, cancel) {
+    clearTimeout(this._lp);
     const p = this.pt; this.pt = null;
     try { this.el.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (this.held) {
+      this.held = false; this.el.classList.remove('held');
+      const over = !cancel && this.overBed(e.clientX, e.clientY); this.drag.over(false);
+      if (over) { this.x = this.drag.bedX(); this.lift = BED_LIFT; this.set('sleep', 20); this.drag.drop(this); }
+      else { this.lift = 0; this.set('sit', 1.5); this.say('Beni yatağıma götürsen?', 2200); this.draw(); }
+      return;
+    }
     if (p && !cancel && !p.stroked && p.d < 12 && this.onTap) this.onTap(this);
   }
   stroke() {
@@ -1143,12 +1202,18 @@ class Pet {
     b.dataset.pos = this.x < 110 ? 'l' : (this.x > W - 110 ? 'r' : 'c');
     this._bt = setTimeout(() => { b.hidden = true; }, ms);
   }
-  wake() { this.awake = Date.now() + 9000; this.set('front', 3.5); }
-  eat() {
-    this.set('eat', 3.4);
-    const d = el('img', { class: 'pdrop', src: sprUrl('carrot_item'), alt: '' });
-    d.style.width = SPR.carrot_item[0] * this.s + 'px'; this.fx.append(d);
-    setTimeout(() => d.remove(), 900); setTimeout(() => this.burst(4), 1200);
+  wake() { this.awake = Date.now() + 9000; this.lift = 0; this.set('front', 3.5); }
+  eat(key = 'carrot') {
+    const f = FOODS[key] || FOODS.carrot, sp = f[1], w = SPR[sp][0] * this.s;
+    const d = el('img', { class: 'pdrop', src: sprUrl(sp), alt: '' }); d.style.width = w + 'px'; d.style.marginLeft = -w / 2 + 'px'; this.fx.append(d);
+    setTimeout(() => d.remove(), 900);
+    if (key === 'carrot') this.set('eat', 3.4);
+    else {
+      this.set('munch', 3.2);
+      const h = el('img', { class: 'pheld', src: sprUrl(sp), alt: '' }); h.style.width = w * .8 + 'px'; h.style.marginLeft = -w * .4 + 'px';
+      setTimeout(() => this.fx.append(h), 800); setTimeout(() => h.remove(), 3000);
+    }
+    setTimeout(() => this.burst(4), 1200);
   }
   love() { this.set('sing', 3); this.burst(8); this.say(pick(LOVE_LINES), 2800); }
 }
@@ -1179,7 +1244,7 @@ async function petIt(gap) {
 let strokeN = 0, strokeT = 0;
 function strokeBunny() {
   strokeN++;
-  if (bunny) { const f = curVal('food'), l = curVal('love'); bunny.food = f; bunny.love = Math.min(100, l + 1.5); bunny.at = Date.now(); paintBunny(); }
+  if (bunny) { const f = curVal('food'), l = curVal('love'); bunny.energy = curVal('energy'); bunny.food = f; bunny.love = Math.min(100, l + 1.5); bunny.at = Date.now(); paintBunny(); }
   if (!strokeT) strokeT = setTimeout(flushStrokes, 1400);
 }
 async function flushStrokes() {
@@ -1201,6 +1266,7 @@ let petLayer = null, lastNudge = 0;
 function layerTap(p) {
   const mood = bunnyMood();
   if (mood === 'sleep') { p.wake(); p.say('Zzz… çok uykum var 🥱', 2800); return; }
+  if (mood === 'sleepy') { p.say(pick(LINES.sleepy), 4500, () => go('bunny')); return; }
   p.burst(4); petIt(12000);
   const u = unreadTarget();
   if (u) p.say(u.text, 4500, () => go(u.view));
@@ -1211,7 +1277,7 @@ function layerIdle(p, mood) {
   if (!p.bub.hidden) return;
   const u = unreadTarget();
   if (u && Date.now() - lastNudge > 90000) { lastNudge = Date.now(); p.say(u.text, 4500, () => go(u.view)); return; }
-  if (Math.random() < .12) p.say(pick(LINES[mood]), 2800, mood === 'hungry' ? () => go('bunny') : null);
+  if (Math.random() < .12) p.say(pick(LINES[mood]), 2800, (mood === 'hungry' || mood === 'sleepy') ? () => go('bunny') : null);
 }
 function syncPetLayer() {
   if (!code || !role) return;
@@ -1227,6 +1293,7 @@ function syncPetLayer() {
 /* ---- Tavşan sayfası ---- */
 function stageTap(p) {
   const mood = bunnyMood();
+  if (mood === 'sleepy') { p.say(pick(LINES.sleepy), 2800); return; }
   if (mood === 'sleep') { p.wake(); p.say('Zzz… çok uykum var 🥱', 2800); return; }
   p.burst(5); petIt(12000);
   p.say(pick(LINES[mood]), 2800);
@@ -1255,11 +1322,15 @@ function nameCard() {
     el('div', { class: 'row', style: 'flex-wrap:nowrap' }, inp, el('button', { class: 'btn', type: 'button', onclick: save }, 'Koy')), st);
 }
 const foodWord = f => f >= 80 ? 'Tok' : f >= 50 ? 'İyi' : f >= 25 ? 'Biraz aç' : 'Çok aç';
+const sleepWord = e => e >= 80 ? 'Dinç' : e >= 50 ? 'İyi' : e >= 25 ? 'Yorgun' : 'Uykusu geldi';
 const loveWord = l => l >= 80 ? 'Çok mutlu' : l >= 50 ? 'Mutlu' : l >= 25 ? 'Biraz yalnız' : 'Küs';
 
 function paintBunny() {
   const u = bui; if (!u || !u.root.isConnected) return;
   const f = curVal('food'), l = curVal('love'), mood = bunnyMood();
+  const en = curVal('energy'), slp = isSleeping();
+  u.fE.style.width = en + '%'; u.fE.classList.toggle('low', !slp && en < 25); u.vE.textContent = slp ? 'Uyuyor 😴' : sleepWord(en);
+  u.sleepBtn.textContent = slp ? '☀️ Uyandır' : '😴 Yatır';
   u.fF.style.width = f + '%'; u.fL.style.width = l + '%';
   u.fF.classList.toggle('low', f < 25); u.fL.classList.toggle('low', l < 25);
   u.vF.textContent = foodWord(f); u.vL.textContent = loveWord(l);
@@ -1269,9 +1340,48 @@ function paintBunny() {
   if (!bunny) return;
   if (bunny.name) u.nameSlot.replaceChildren(); else if (!u.nameSlot.firstChild) u.nameSlot.append(nameCard());
   u.info.replaceChildren(
-    el('div', {}, bunny.last_fed_at ? `🥕 Son besleyen: ${nameOf(bunny.last_fed_by)} · ${rel(bunny.last_fed_at)}` : '🥕 Henüz kimse beslemedi'),
+    el('div', {}, bunny.last_fed_at ? `${(FOODS[bunny.last_food] || FOODS.carrot)[2]} Son besleyen: ${nameOf(bunny.last_fed_by)} · ${rel(bunny.last_fed_at)}${FOODS[bunny.last_food] ? ' (' + FOODS[bunny.last_food][0].toLowerCase() + ')' : ''}` : '🥕 Henüz kimse beslemedi'),
     el('div', {}, bunny.last_pet_at ? `♥ Son seven: ${nameOf(bunny.last_pet_by)} · ${rel(bunny.last_pet_at)}` : '♥ Henüz kimse sevmedi'));
+  paintKiss(u);
   u.counts.replaceChildren(...['admin', 'reader'].map(r => el('div', { class: 'stat' }, nameOf(r) + ': ', el('b', {}, `🥕 ${bunny.feeds[r]}  ♥ ${bunny.pets[r]}`))));
+}
+
+const kissOwed = r => !bunny || !bunny.kiss ? 0 : Math.max(0, bunny.kiss[r] + bunny.kiss.rate * (Date.now() - bunny.at) / 864e5);
+function paintKiss(u) {
+  if (!bunny || !bunny.kiss) return;
+  const k = bunny.kiss, l = k.log && k.log[0];
+  u.kiss.replaceChildren(
+    el('h3', {}, 'Öpücük bankası 💋'),
+    el('p', { class: 'muted', style: 'margin:0' }, `Herkesin borcu her gün ${k.rate} 💋 artar. Buluşunca öpücükle ödenir.`),
+    ...['admin', 'reader'].map(r => { const n = Math.round(kissOwed(r)); return el('div', { class: 'krow' }, el('span', { class: 'kn' }, nameOf(r)),
+      el('b', { class: 'kneg' }, n > 0 ? `−${n} 💋` : '0 💋 ✨'), el('button', { class: 'chip', type: 'button', onclick: () => paySheet(r) }, 'Öde')); }),
+    l ? el('div', { class: 'muted' }, `Son ödeme: ${nameOf(l.who)} · ${Math.round(l.amount)} 💋 · ${rel(l.at)}`) : el('div', { class: 'muted' }, 'Henüz ödeme yapılmadı.'),
+    el('div', { class: 'row' }, el('button', { class: 'chip', type: 'button', onclick: rateSheet }, 'Günlük borcu değiştir')));
+}
+function paySheet(who) {
+  const owed = Math.round(kissOwed(who));
+  const inp = el('input', { id: 'kamt', type: 'number', inputmode: 'numeric', min: '1', max: '100000', placeholder: 'Kaç öpücük?', value: '10' });
+  const st = el('div', { class: 'status err', role: 'status' }); let close;
+  const go2 = async extra => {
+    st.textContent = '';
+    try { const r = await bapi('kiss_pay', { who, ...extra }); setBunny(r.bunny); close(); if (bui && bui.pet) bui.pet.love(); }
+    catch (e) { st.textContent = 'Kaydedilemedi, tekrar dene.'; }
+  };
+  const chips = el('div', { class: 'chips' }, ...[5, 10, 20, 50].map(n => el('button', { class: 'chip', type: 'button', onclick: () => { inp.value = n; } }, String(n))));
+  close = openSheet(`${nameOf(who)} borcunu ödüyor 💋`,
+    el('p', { class: 'muted' }, owed > 0 ? `Şu anki borç: −${owed} 💋` : 'Şu an borç yok ✨'),
+    el('div', { class: 'field' }, el('label', { for: 'kamt' }, 'Ödenen öpücük'), inp), chips, st,
+    el('button', { class: 'btn', type: 'button', onclick: () => { const a = Number(inp.value); if (!(a > 0)) { st.textContent = 'Bir sayı yaz.'; return; } go2({ amount: a }); } }, 'Öde'),
+    el('button', { class: 'btn ghost', type: 'button', style: 'margin-top:8px', onclick: () => go2({ all: true }) }, 'Borcu sıfırla'));
+}
+function rateSheet() {
+  const inp = el('input', { id: 'krate', type: 'number', inputmode: 'decimal', min: '0', max: '200', value: String(bunny ? bunny.kiss.rate : 10) });
+  const st = el('div', { class: 'status err', role: 'status' }); let close;
+  close = openSheet('Günlük borcu değiştir',
+    el('p', { class: 'muted' }, 'Her gün herkesin borcuna kaç öpücük eklensin? Şimdiye kadar biriken borç korunur.'),
+    el('div', { class: 'field' }, el('label', { for: 'krate' }, 'Günlük öpücük'), inp), st,
+    el('button', { class: 'btn', type: 'button', onclick: async () => {
+      try { setBunny((await bapi('kiss_rate', { rate: Number(inp.value) })).bunny); close(); } catch (e) { st.textContent = 'Kaydedilemedi, tekrar dene.'; } } }, 'Kaydet'));
 }
 
 function bunnyView() {
@@ -1279,26 +1389,52 @@ function bunnyView() {
   const head = header(bName(), 'Birlikte baktığımız minik dostumuz ♥');
   const nameSlot = el('div');
   const host = el('div', { class: 'stage-host' });
-  const stage = el('div', { class: 'stage' + (isNight() ? ' night' : '') }, el('div', { class: 'stage-sky' }), el('div', { class: 'stage-ground' }), host);
+  const bed = el('img', { class: 'bed', src: sprUrl('bed'), alt: '' });
+  const stage = el('div', { class: 'stage' + (isNight() ? ' night' : '') }, el('div', { class: 'stage-sky' }), el('div', { class: 'stage-ground' }), bed, host);
   const face = el('img', { class: 'bface', alt: '' }), say = el('div', { class: 'bsay' });
   const mkBar = (label, cls) => { const fill = el('div', { class: 'fill ' + cls }), val = el('b'); return { fill, val, node: el('div', { class: 'bar' }, el('div', { class: 'bl' }, el('span', {}, label), val), el('div', { class: 'track' }, fill)) }; };
-  const bf = mkBar('Karnı', 'carrot'), bl = mkBar('Sevgisi', 'love');
-  const card = el('div', { class: 'bcard' }, face, el('div', { class: 'btxt' }, say, bf.node, bl.node));
+  const bf = mkBar('Karnı', 'carrot'), bl = mkBar('Sevgisi', 'love'), be = mkBar('Enerjisi', 'zz');
+  const card = el('div', { class: 'bcard' }, face, el('div', { class: 'btxt' }, say, bf.node, bl.node, be.node));
   const st = el('div', { class: 'status', role: 'status' });
   const note = (m, err) => { st.className = 'status' + (err ? ' err' : ''); st.textContent = m; };
-  const feed = el('button', { class: 'btn', type: 'button' }, el('img', { src: sprUrl('carrot_item'), alt: '' }), 'Havuç ver');
+  const feed = el('button', { class: 'btn', type: 'button' }, el('img', { src: sprUrl('carrot_item'), alt: '' }), 'Yemek ver');
+  const sleepBtn = el('button', { class: 'btn ghost', type: 'button' }, '😴 Yatır');
+  const kiss = el('div', { class: 'kbank' });
   const love = el('button', { class: 'btn ghost', type: 'button' }, '♥ Sev');
   const info = el('div', { class: 'notice binfo' }), counts = el('div', { class: 'stats' });
-  const me = bui = { root: box, title: head.querySelector('h1'), face, say, fF: bf.fill, fL: bl.fill, vF: bf.val, vL: bl.val, info, counts, nameSlot, pet: null, mood: '' };
+  const me = bui = { root: box, title: head.querySelector('h1'), face, say, fF: bf.fill, fL: bl.fill, fE: be.fill, vF: bf.val, vL: bl.val, vE: be.val, sleepBtn, kiss, info, counts, nameSlot, pet: null, mood: '' };
 
-  feed.onclick = async () => {
+  const doFeed = async key => {
     feed.disabled = true; note('');
     try {
-      const r = await bapi('feed'); setBunny(r.bunny);
-      if (r.full) me.pet && me.pet.say('Doydum, çok sağ ol! 😊', 3000);
-      else { me.pet && me.pet.eat(); note('Afiyet olsun! 🥕'); }
+      const r = await bapi('feed', { item: key }); setBunny(r.bunny);
+      if (r.asleep) { note('Uyuyor, uyandırmayalım 😴'); me.pet && me.pet.say('Zzz…', 2000); }
+      else if (r.full) me.pet && me.pet.say('Doydum, çok sağ ol! 😊', 3000);
+      else { me.pet && me.pet.eat(key); note(`Afiyet olsun! ${FOODS[key][2]}`); }
     } catch (e) { note('Şu an ulaşılamadı, biraz sonra tekrar dene.', true); }
     feed.disabled = false;
+  };
+  feed.onclick = () => {
+    let close;
+    const grid = el('div', { class: 'foods' }, ...Object.entries(FOODS).map(([k, f]) => el('button', { class: 'food', type: 'button', onclick: () => { close(); doFeed(k); } },
+      el('img', { src: sprUrl(f[1]), alt: '' }), f[0], el('small', {}, `Tokluk +${f[3]}`))));
+    close = openSheet('Ne yedirelim?', grid);
+  };
+  const putToBed = async (fromDrag) => {
+    const p = me.pet;
+    try {
+      const r = await bapi('sleep'); setBunny(r.bunny);
+      if (r.notTired) { if (p) { p.lift = 0; p.set('sit', 2); p.say('Uykum yok ki! 😄', 2600); } note('Henüz uykusu yok, biraz yorulsun 😄'); }
+      else { note('İyi uykular 🌙'); if (p && !fromDrag) p.set('sit', .05); }
+    } catch (e) { if (p) { p.lift = 0; p.set('sit', 2); } note('Şu an ulaşılamadı, biraz sonra tekrar dene.', true); }
+  };
+  sleepBtn.onclick = async () => {
+    sleepBtn.disabled = true; note('');
+    if (isSleeping()) {
+      try { setBunny((await bapi('wake')).bunny); me.pet && (me.pet.wake(), me.pet.say('Günaydın! ☀️', 2500)); note(''); }
+      catch (e) { note('Şu an ulaşılamadı, biraz sonra tekrar dene.', true); }
+    } else await putToBed(false);
+    sleepBtn.disabled = false;
   };
   love.onclick = async () => {
     const p = me.pet; if (!p) return;
@@ -1307,12 +1443,13 @@ function bunnyView() {
     const r = await petIt(8500);
     if (r === null) note('Şu an ulaşılamadı, biraz sonra tekrar dene.', true); else note('');
   };
-  box.append(head, nameSlot, stage, card, el('div', { class: 'bbtns' }, feed, love), st, info, counts,
+  box.append(head, nameSlot, stage, card, el('div', { class: 'bbtns' }, feed, love, sleepBtn), st, kiss, info, counts,
     el('div', { class: 'row' }, el('button', { class: 'chip', type: 'button', onclick: renameSheet }, 'Adını değiştir')),
-    el('p', { class: 'muted', style: 'margin:0' }, 'Parmağını üzerinde gezdirerek de sevebilirsin ♥ Karnı ve sevgisi zamanla azalır, hiç üzülmesin diye ikimiz de arada uğrayalım. Besleyince diğerine bildirim gider.'));
+    el('p', { class: 'muted', style: 'margin:0' }, 'Parmağını üzerinde gezdirerek sevebilir, basılı tutup yatağına sürükleyerek uyutabilirsin ♥ Karnı, sevgisi ve enerjisi zamanla azalır; acıkınca, sevgi isteyince ya da uykusu gelince ikimize de bildirim gider.'));
   if (!bunny) refreshBunny();
   const timer = setInterval(() => { if (!box.isConnected) clearInterval(timer); else paintBunny(); }, 30000);
-  queueMicrotask(() => { paintBunny(); if (host.isConnected) me.pet = new Pet(host, { s: 2, onTap: stageTap, onStroke: strokeBunny, mood: bunnyMood, onIdle: (p, mood) => { if (p.bub.hidden && Math.random() < .15) p.say(pick(LINES[mood]), 2800); } }); });
+  queueMicrotask(() => { paintBunny(); if (host.isConnected) me.pet = new Pet(host, { s: 2, onTap: stageTap, bed: () => bed.offsetLeft + bed.offsetWidth / 2,
+    drag: { bedEl: () => bed, bedX: () => bed.offsetLeft + bed.offsetWidth / 2, over: v => bed.classList.toggle('over', v), drop: () => putToBed(true) }, onStroke: strokeBunny, mood: bunnyMood, onIdle: (p, mood) => { if (p.bub.hidden && Math.random() < .15) p.say(pick(LINES[mood]), 2800); } }); });
   return box;
 }
 
