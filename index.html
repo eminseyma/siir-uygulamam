@@ -173,8 +173,9 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
 :root{--sky1:#ffe3ee;--sky2:#efe2fb;--grass:#c4e6cd;--grass2:#a8d5b5}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sky1:#3b2548;--sky2:#2a1c36;--grass:#35574a;--grass2:#2c4a3f}}
 :root[data-theme="dark"]{--sky1:#3b2548;--sky2:#2a1c36;--grass:#35574a;--grass2:#2c4a3f}
-#pet-layer{position:fixed;left:0;right:0;bottom:calc(78px + env(safe-area-inset-bottom,0px));height:0;z-index:4;pointer-events:none}
-.pet{position:absolute;left:0;bottom:0;pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;will-change:transform}
+#pet-layer{position:fixed;inset:0;z-index:4;pointer-events:none}
+.pet{position:absolute;left:0;bottom:0;pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:none;will-change:transform}
+.pet.free{top:0;bottom:auto}
 .pet:focus-visible{outline:3px solid var(--lav);outline-offset:2px;border-radius:12px}
 .pet img{display:block;image-rendering:pixelated;-webkit-user-drag:none;user-select:none;-webkit-user-select:none;transform-origin:50% 100%}
 .pet-shadow{position:absolute;left:50%;bottom:-3px;width:62%;height:7px;margin-left:-31%;border-radius:50%;background:rgba(70,30,55,.2)}
@@ -991,8 +992,8 @@ const LINES = {
   sleep: ['Zzz… sessiz, uyuyorum.', 'Rüyamda havuç tarlası var…'],
   hungry: ['Karnım gurulduyor…', 'Bir havuç alabilir miyim?', 'Çok acıktım…'],
   sulk: ['Beni biraz seversen barışırım.', 'Kimse benimle ilgilenmiyor…'],
-  happy: ['Sizi çok seviyorum!', 'Bugün çok mutluyum ♥', 'Bu defterin en tatlısı benim.', 'İkinizi birlikte görmek çok güzel!'],
-  ok: ['Merhaba!', 'Bir şiir okuyalım mı?', 'Beni sever misin?'],
+  happy: ['Sizi çok seviyorum!', 'Bugün çok mutluyum ♥', 'Bu defterin en tatlısı benim.', 'İkinizi birlikte görmek çok güzel!', 'Anne ve babamı çok seviyorum!', 'Şeyma\'yı çok seviyorum ♥'],
+  ok: ['Merhaba!', 'Bir şiir okuyalım mı?', 'Beni sever misin?', 'Anne ve babamı çok seviyorum!', 'Şeyma\'yı çok seviyorum ♥'],
 };
 const LOVE_LINES = ['Kalbim kıpır kıpır ♥', 'Bir tanesin!', 'Çok sevildim!', 'Yine mi? Hiç bırakma!'];
 
@@ -1000,23 +1001,31 @@ const LOVE_LINES = ['Kalbim kıpır kıpır ♥', 'Bir tanesin!', 'Çok sevildim
 const pets = new Set(); let petRaf = 0, petLast = 0, petAcc = 0;
 class Pet {
   constructor(host, o) {
-    this.host = host; this.s = o.s || 1; this.onTap = o.onTap; this.moodFn = o.mood; this.peekOK = !!o.peek; this.onIdle = o.onIdle;
-    this.x = 0; this.dir = 1; this.mode = 'sit'; this.t = 0; this.dur = 2; this.ft = 0; this.fr = 0; this.jy = 0; this.tx = 0; this.spd = 1;
-    this.after = null; this.awake = 0; this.zt = 0; this.cur = 'sit';
-    this.el = el('div', { class: 'pet', role: 'button', tabindex: '0', 'aria-label': 'Tavşanla ilgilen' });
+    this.host = host; this.s = o.s || 1; this.onTap = o.onTap; this.moodFn = o.mood; this.peekOK = !!o.peek; this.onIdle = o.onIdle; this.onStroke = o.onStroke;
+    this.free = !!o.free; this.speed = o.speed || 30;
+    this.x = 0; this.y = 0; this.tx = 0; this.ty = 0; this.dir = 1; this.mode = 'sit'; this.t = 0; this.dur = 2; this.ft = 0; this.fr = 0; this.jy = 0; this.spd = 1;
+    this.after = null; this.awake = 0; this.zt = 0; this.cur = 'sit'; this.pt = null; this.sc = 0;
+    this.el = el('div', { class: 'pet' + (this.free ? ' free' : ''), role: 'button', tabindex: '0', 'aria-label': 'Tavşanla ilgilen' });
     this.sh = el('i', { class: 'pet-shadow' });
     this.img = el('img', { alt: '', draggable: 'false' });
     this.fx = el('div', { class: 'pet-fx' });
     this.bub = el('div', { class: 'pet-bub', hidden: true });
     this.el.append(this.sh, this.img, this.fx, this.bub);
-    this.el.addEventListener('click', () => this.onTap && this.onTap(this));
+    this.el.addEventListener('pointerdown', e => this.pDown(e));
+    this.el.addEventListener('pointermove', e => this.pMove(e));
+    this.el.addEventListener('pointerup', e => this.pUp(e, false));
+    this.el.addEventListener('pointercancel', e => this.pUp(e, true));
     this.el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.onTap && this.onTap(this); } });
     host.append(this.el);
     this.x = this.W() * rnd(.25, .75);
+    this.y = this.free ? rnd(this.minY(), this.maxY()) : 0;
     this.pose('sit'); this.next(); this.draw();
     pets.add(this); startPets();
   }
   W() { return this.host.clientWidth || innerWidth; }
+  H() { return this.host.clientHeight || innerHeight; }
+  minY() { return Math.min(140, this.H() * .3); }
+  maxY() { return Math.max(this.minY() + 40, this.H() - 92); }
   hw() { return SPR[this.cur][0] * this.s / 2; }
   pose(n) {
     if (this.cur === n && this.img.getAttribute('src')) return;
@@ -1026,10 +1035,18 @@ class Pet {
   }
   set(mode, dur) { this.mode = mode; this.t = 0; this.dur = dur; this.ft = 0; this.jy = 0; }
   mood() { return Date.now() < this.awake ? 'ok' : (this.moodFn ? this.moodFn() : 'ok'); }
-  goto(x, then) {
+  goto(x, y, then) {
     const m = this.hw() + 6, W = this.W();
-    this.tx = Math.max(m, Math.min(W - m, x)); this.after = then || null;
-    this.dir = this.tx >= this.x ? 1 : -1; this.set('walk', 99);
+    this.tx = Math.max(m, Math.min(W - m, x));
+    this.ty = this.free ? Math.max(this.minY(), Math.min(this.maxY(), y)) : this.y;
+    this.after = then || null;
+    if (Math.abs(this.tx - this.x) > 3) this.dir = this.tx > this.x ? 1 : -1;
+    this.set('walk', 99);
+  }
+  target() {
+    if (!this.free) return [this.x + (Math.random() < .5 ? -1 : 1) * rnd(70, 200 * this.s), this.y];
+    const W = this.W(), m = this.hw() + 6;
+    return [rnd(m, W - m), rnd(this.minY(), this.maxY())];
   }
   next() {
     const mood = this.mood(), W = this.W(), r = Math.random();
@@ -1037,28 +1054,29 @@ class Pet {
     if (mood === 'sleep') return this.set('sleep', 20);
     this.spd = (mood === 'hungry' || mood === 'sulk') ? .6 : 1;
     if (this.onIdle) this.onIdle(this, mood);
-    const far = () => this.x + (Math.random() < .5 ? -1 : 1) * rnd(70, 200 * this.s);
-    if (mood === 'hungry' || mood === 'sulk') return r < .45 ? this.goto(far()) : this.set('sit', rnd(3, 6));
-    if (r < .46) return this.goto(far());
-    if (r < .62) return this.set('sit', rnd(2.5, 5));
-    if (r < .72) return this.set('front', rnd(2, 4));
+    if (mood === 'hungry' || mood === 'sulk') return r < .45 ? this.goto(...this.target()) : this.set('sit', rnd(3, 6));
+    if (r < .50) return this.goto(...this.target());
+    if (r < .64) return this.set('sit', rnd(2.5, 5));
+    if (r < .73) return this.set('front', rnd(2, 4));
     if (r < .79) return this.set('back', rnd(2, 3.5));
     if (r < .88) { this.dir = Math.random() < .5 ? -1 : 1; return this.set('jump', .7); }
     if (r < .94) return this.set(mood === 'happy' ? 'sing' : 'sit', rnd(2.5, 4));
-    if (this.peekOK) return this.goto(Math.random() < .5 ? 0 : W, 'peek');
+    if (this.peekOK) return this.goto(Math.random() < .5 ? 0 : W, this.free ? rnd(this.minY(), this.maxY()) : this.y, 'peek');
     return this.set('sit', 3);
   }
   update(dt) {
     this.t += dt; this.ft += dt;
     const W = this.W();
     if (this.mode === 'walk') {
-      const step = 30 * this.s * this.spd * dt, d = this.tx - this.x;
-      if (Math.abs(d) <= step) {
-        this.x = this.tx; const a = this.after; this.after = null;
+      const dx = this.tx - this.x, dy = this.free ? this.ty - this.y : 0, dist = Math.hypot(dx, dy), step = this.speed * this.s * this.spd * dt;
+      if (dist <= step) {
+        this.x = this.tx; if (this.free) this.y = this.ty;
+        const a = this.after; this.after = null;
         if (a === 'peek') { this.pose('peek'); const L = this.x < W / 2; this.dir = L ? 1 : -1; this.x = L ? this.hw() : W - this.hw(); this.set('peek', 3.4); }
         else this.next();
       } else {
-        this.x += Math.sign(d) * step; this.dir = Math.sign(d);
+        this.x += dx / dist * step; this.y += dy / dist * step;
+        if (Math.abs(dx) > 3) this.dir = dx > 0 ? 1 : -1;
         if (this.ft > .13) { this.ft = 0; this.fr = (this.fr + 1) % 4; }
         this.pose('walk' + this.fr);
       }
@@ -1072,12 +1090,42 @@ class Pet {
       if (this.t >= this.dur) this.next();
     }
     this.x = Math.max(this.hw(), Math.min(W - this.hw(), this.x));
+    if (this.free) this.y = Math.max(this.minY(), Math.min(this.maxY(), this.y));
     this.draw();
   }
   draw() {
-    this.el.style.transform = `translate3d(${(this.x - this.hw()).toFixed(1)}px,0,0)`;
+    const gx = (this.x - this.hw()).toFixed(1);
+    this.el.style.transform = this.free ? `translate3d(${gx}px,${(this.y - SPR[this.cur][1] * this.s).toFixed(1)}px,0)` : `translate3d(${gx}px,0,0)`;
     const f = FLIPS.has(this.cur) && this.dir < 0 ? -1 : 1;
     this.img.style.transform = `translateY(${(-this.jy).toFixed(1)}px) scaleX(${f})`;
+  }
+  /* parmakla okşama: tavşanın üzerinde parmağı gezdirince kalp çıkar, sevgi artar */
+  pDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    this.pt = { x: e.clientX, y: e.clientY, d: 0, acc: 0, stroked: false };
+    try { this.el.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+  pMove(e) {
+    const p = this.pt; if (!p) return;
+    const seg = Math.hypot(e.clientX - p.x, e.clientY - p.y); p.x = e.clientX; p.y = e.clientY; p.d += seg;
+    const r = this.el.getBoundingClientRect(), m = 14;
+    if (e.clientX < r.left - m || e.clientX > r.right + m || e.clientY < r.top - m || e.clientY > r.bottom + m) return;
+    p.acc += seg;
+    if (p.acc >= 55) { p.acc -= 55; p.stroked = true; this.stroke(); }
+  }
+  pUp(e, cancel) {
+    const p = this.pt; this.pt = null;
+    try { this.el.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (p && !cancel && !p.stroked && p.d < 12 && this.onTap) this.onTap(this);
+  }
+  stroke() {
+    if (this.mood() === 'sleep') { this.burst(1); if (this.bub.hidden) this.say('Mmm… ♥', 1600); }
+    else {
+      if (this.mode === 'sing') this.t = 0; else this.set('sing', 1.6);
+      this.burst(1);
+      if (++this.sc % 5 === 0) this.say(pick(LOVE_LINES), 1800);
+    }
+    if (this.onStroke) this.onStroke(this);
   }
   fly(kind) {
     const z = kind === 'z', w = this.hw() * 2;
@@ -1125,7 +1173,21 @@ let lastPetCall = 0;
 async function petIt(gap) {
   if (Date.now() - lastPetCall < gap) return false;
   lastPetCall = Date.now();
-  try { const r = await bapi('pet'); setBunny(r.bunny); return r; } catch (e) { return null; }
+  try { const r = await bapi('pet', { n: 1 }); setBunny(r.bunny); return r; } catch (e) { return null; }
+}
+/* okşama: çok sayıda hareketi biriktirip birkaç saniyede bir sunucuya gönder */
+let strokeN = 0, strokeT = 0;
+function strokeBunny() {
+  strokeN++;
+  if (bunny) { const f = curVal('food'), l = curVal('love'); bunny.food = f; bunny.love = Math.min(100, l + 1.5); bunny.at = Date.now(); paintBunny(); }
+  if (!strokeT) strokeT = setTimeout(flushStrokes, 1400);
+}
+async function flushStrokes() {
+  strokeT = 0;
+  const n = strokeN; if (!n) return;
+  if (Date.now() - lastPetCall < 3200) { strokeT = setTimeout(flushStrokes, 1000); return; }
+  strokeN = 0; lastPetCall = Date.now();
+  try { setBunny((await bapi('pet', { n })).bunny); } catch (e) {}
 }
 function unreadTarget() {
   if (chats.some(m => m.author === oth(role) && !m.seen_at)) return { text: '💌 Sana bir yazı bırakılmış!', view: 'chat' };
@@ -1153,11 +1215,11 @@ function layerIdle(p, mood) {
 }
 function syncPetLayer() {
   if (!code || !role) return;
-  const show = view === 'mems' || view === 'album' || (view === 'poems' && tab !== 'write') || (view === 'chat' && ctab !== 'write');
+  const show = view !== 'bunny';
   if (!petLayer && show) {
     petLayer = el('div', { id: 'pet-layer' }); document.body.append(petLayer);
     Object.keys(SPR).forEach(n => { const i = new Image(); i.src = sprUrl(n); });
-    new Pet(petLayer, { s: 1, peek: true, onTap: layerTap, mood: bunnyMood, onIdle: layerIdle });
+    new Pet(petLayer, { s: 1, free: true, speed: 40, peek: true, onTap: layerTap, onStroke: strokeBunny, mood: bunnyMood, onIdle: layerIdle });
   }
   if (petLayer) { petLayer.hidden = !show; if (show) startPets(); }
 }
@@ -1247,10 +1309,10 @@ function bunnyView() {
   };
   box.append(head, nameSlot, stage, card, el('div', { class: 'bbtns' }, feed, love), st, info, counts,
     el('div', { class: 'row' }, el('button', { class: 'chip', type: 'button', onclick: renameSheet }, 'Adını değiştir')),
-    el('p', { class: 'muted', style: 'margin:0' }, 'Karnı ve sevgisi zamanla azalır ama hiç üzülmesin diye ikimiz de arada uğrayalım ♥ Besleyince diğerine bildirim gider.'));
+    el('p', { class: 'muted', style: 'margin:0' }, 'Parmağını üzerinde gezdirerek de sevebilirsin ♥ Karnı ve sevgisi zamanla azalır, hiç üzülmesin diye ikimiz de arada uğrayalım. Besleyince diğerine bildirim gider.'));
   if (!bunny) refreshBunny();
   const timer = setInterval(() => { if (!box.isConnected) clearInterval(timer); else paintBunny(); }, 30000);
-  queueMicrotask(() => { paintBunny(); if (host.isConnected) me.pet = new Pet(host, { s: 2, onTap: stageTap, mood: bunnyMood, onIdle: (p, mood) => { if (p.bub.hidden && Math.random() < .15) p.say(pick(LINES[mood]), 2800); } }); });
+  queueMicrotask(() => { paintBunny(); if (host.isConnected) me.pet = new Pet(host, { s: 2, onTap: stageTap, onStroke: strokeBunny, mood: bunnyMood, onIdle: (p, mood) => { if (p.bub.hidden && Math.random() < .15) p.say(pick(LINES[mood]), 2800); } }); });
   return box;
 }
 
