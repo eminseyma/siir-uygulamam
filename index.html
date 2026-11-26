@@ -1019,7 +1019,7 @@ let bunny = null, bui = null;
 const bRate = k => k === 'energy' ? (bunny.sleeping ? -bunny.rates.energy_sleep : bunny.rates.energy_awake) : bunny.rates[k];
 const curVal = k => !bunny ? 70 : Math.max(0, Math.min(100, (bunny[k] == null ? 80 : bunny[k]) - bRate(k) * (Date.now() - bunny.at) / 3.6e6));
 const isSleeping = () => !!bunny && !!bunny.sleeping && curVal('energy') < 100;
-const FOODS = { carrot: ['Havuç', 'carrot_item', '🥕', 30], lettuce: ['Marul', 'food_lettuce', '🥬', 22], apple: ['Elma', 'food_apple', '🍎', 25], broccoli: ['Brokoli', 'food_broccoli', '🥦', 22], cucumber: ['Salatalık', 'food_cucumber', '🥒', 18], hay: ['Kuru ot', 'food_hay', '🌾', 15], strawberry: ['Çilek', 'food_strawberry', '🍓', 8] };
+const FOODS = { carrot: ['Havuç', 'carrot_item', '🥕', 30, 2], lettuce: ['Marul', 'food_lettuce', '🥬', 22, 2], apple: ['Elma', 'food_apple', '🍎', 25, 3], broccoli: ['Brokoli', 'food_broccoli', '🥦', 22, 2], cucumber: ['Salatalık', 'food_cucumber', '🥒', 18, 1], hay: ['Kuru ot', 'food_hay', '🌾', 15, 1], strawberry: ['Çilek', 'food_strawberry', '🍓', 8, 4] };
 const BED_LIFT = 22;
 function preloadBunny() {
   Object.keys(SPR).forEach(n => { const i = new Image(); i.src = sprUrl(n); });
@@ -1510,14 +1510,14 @@ function bunnyView() {
       const r = await bapi('feed', { item: key }); setBunny(r.bunny);
       if (r.asleep) { note('Uyuyor, uyandırmayalım 😴'); me.pet && me.pet.say('Zzz…', 2000); }
       else if (r.full) me.pet && me.pet.say('Doydum, çok sağ ol! 😊', 3000);
-      else { me.pet && me.pet.eat(key); note(`Afiyet olsun! ${FOODS[key][2]}`); }
+      else { me.pet && me.pet.eat(key); note(`Afiyet olsun! ${FOODS[key][2]} Borcuna +${FOODS[key][4]} öpücük yazıldı 💋`); }
     } catch (e) { note('Şu an ulaşılamadı, biraz sonra tekrar dene.', true); }
     feed.disabled = false;
   };
   feed.onclick = () => {
     let close;
     const grid = el('div', { class: 'foods' }, ...Object.entries(FOODS).map(([k, f]) => el('button', { class: 'food', type: 'button', onclick: () => { close(); doFeed(k); } },
-      el('img', { src: sprUrl(f[1]), alt: '' }), f[0], el('small', {}, `Tokluk +${f[3]}`))));
+      el('img', { src: sprUrl(f[1]), alt: '' }), f[0], el('small', {}, `Tokluk +${f[3]}`), el('small', {}, `💋 ${f[4]} öpücük`))));
     close = openSheet('Ne yedirelim?', grid);
   };
   wardrobe.onclick = () => {
@@ -1561,7 +1561,7 @@ function bunnyView() {
   };
   box.append(head, nameSlot, stage, card, el('div', { class: 'bbtns' }, feed, love, sleepBtn), st, kiss, info, counts,
     el('div', { class: 'row' }, el('button', { class: 'chip', type: 'button', onclick: renameSheet }, 'Adını değiştir')),
-    el('p', { class: 'muted', style: 'margin:0' }, 'Parmağını üzerinde gezdirerek sevebilir, basılı tutup yatağına sürükleyerek uyutabilirsin, gardıroptan kıyafet seçebilirsin ♥ Karnı, sevgisi ve enerjisi zamanla azalır; acıkınca, sevgi isteyince ya da uykusu gelince ikimize de bildirim gider.'));
+    el('p', { class: 'muted', style: 'margin:0' }, 'Yedirdiğin her yemek öpücük borcuna yazılır 💋 Parmağını üzerinde gezdirerek sevebilir, basılı tutup yatağına sürükleyerek uyutabilirsin, gardıroptan kıyafet seçebilirsin ♥ Karnı, sevgisi ve enerjisi zamanla azalır; acıkınca, sevgi isteyince ya da uykusu gelince ikimize de bildirim gider.'));
   if (!bunny) refreshBunny();
   const timer = setInterval(() => { if (!box.isConnected) clearInterval(timer); else paintBunny(); }, 30000);
   queueMicrotask(() => { paintBunny(); if (host.isConnected) me.pet = new Pet(host, { s: 2, onTap: stageTap, bed: () => bed.offsetLeft + bed.offsetWidth / 2,
