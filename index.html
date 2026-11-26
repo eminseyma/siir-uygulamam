@@ -201,7 +201,20 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
 .stage.night .stage-sky::after{content:"";position:absolute;right:14%;top:22px;width:30px;height:30px;border-radius:50%;background:#fff4c8;box-shadow:0 0 22px rgba(255,244,200,.45)}
 .stage-ground{position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(var(--grass),var(--grass2))}
 .stage-ground::before{content:"";position:absolute;left:9%;top:10px;width:5px;height:5px;background:#fff;box-shadow:58px 12px 0 #ffd0e0,132px 4px 0 #fff,196px 16px 0 #ffd0e0,251px 6px 0 #fff,300px 14px 0 #ffd0e0,372px 8px 0 #fff,430px 15px 0 #ffd0e0}
-.stage-host{position:absolute;left:0;right:0;bottom:14px;height:176px}
+.stage-host{position:absolute;left:0;right:0;bottom:14px;height:176px;pointer-events:none}
+.wardrobe{position:absolute;left:10px;bottom:14px;width:64px;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .2s,filter .2s}
+.wardrobe img{display:block;width:100%;image-rendering:pixelated}
+.wardrobe:hover,.wardrobe:focus-visible{transform:translateY(-2px);filter:drop-shadow(0 0 8px var(--lav))}
+.wardrobe:focus-visible{outline:none}
+.wd-tag{position:absolute;left:50%;top:-6px;transform:translate(-50%,-100%);font-size:.7rem;font-weight:800;color:var(--rose-deep);background:var(--surface-solid);border:1.5px solid var(--line);border-radius:10px;padding:1px 7px;white-space:nowrap;pointer-events:none}
+.pet img.dressed{animation:dressup .8s ease-out}
+@keyframes dressup{0%{filter:brightness(1.35) drop-shadow(0 0 8px #fff)}60%{filter:brightness(1.12) drop-shadow(0 0 5px #fff)}100%{filter:none}}
+.wd-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 4px}
+.wd-item{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--surface-solid);border:1.5px solid var(--line);border-radius:18px;padding:10px 4px 10px;font-weight:700;color:var(--ink);font-size:.78rem;line-height:1.2;text-align:center;justify-content:flex-end}
+.wd-item .wd-pic{height:90px;display:flex;align-items:flex-end;justify-content:center}
+.wd-item img{height:90px;width:auto;max-width:100%;image-rendering:pixelated}
+.wd-item[aria-pressed="true"]{border-color:var(--rose);box-shadow:0 0 0 2px var(--rose) inset}
+.wd-item small{color:var(--muted);font-weight:600;font-size:.68rem}
 .bcard{display:flex;gap:14px;align-items:center;background:var(--surface);border:1.5px solid var(--line);border-radius:28px;padding:16px;box-shadow:var(--shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .bface{flex:none;image-rendering:pixelated;width:84px}
 .btxt{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
@@ -989,6 +1002,12 @@ async function bapi(action, extra = {}) {
 /* sprite boyutları [genişlik, yükseklik] — dosyalar bunny/ klasöründe */
 const SPR = {back:[39,70],carrot:[40,59],carrot_item:[24,33],f_angry:[46,60],f_cry:[42,58],f_happy:[42,53],f_love:[39,52],f_neutral:[42,54],f_surprised:[41,53],front:[42,75],jump:[51,57],peek:[26,75],sing:[39,67],sit:[49,66],sleep:[77,50],walk0:[53,70],walk1:[53,67],walk2:[51,69],walk3:[51,68],bed:[90,32],food_apple:[26,28],food_broccoli:[28,30],food_cucumber:[34,16],food_hay:[30,24],food_lettuce:[28,26],food_strawberry:[22,26]};
 const sprUrl = n => `bunny/${n}.png`;
+/* gardırop: kıyafet sprite'ları orijinal tavşanla aynı hizada [genişlik, yükseklik, aşağı taşma] */
+const OUT = {"gingham":{"front":[48,75,0],"walk0":[53,70,0],"walk1":[53,68,1],"walk2":[51,69,0],"walk3":[53,70,2],"jump":[57,58,1],"sit":[55,67,1],"sleep":[77,49,0],"sing":[39,68,1],"carrot":[40,61,2],"back":[41,70,0],"peek":[26,75,0]},"night":{"front":[48,75,0],"walk0":[53,70,0],"walk1":[53,67,0],"walk2":[51,68,-1],"walk3":[53,70,2],"jump":[57,58,1],"sit":[59,67,1],"sleep":[77,50,0],"sing":[41,68,1],"carrot":[46,64,5],"back":[41,70,0],"peek":[26,75,0]},"princess":{"front":[48,75,0],"walk0":[53,71,1],"walk1":[53,68,1],"walk2":[55,68,-1],"walk3":[53,70,2],"jump":[57,59,2],"sit":[61,69,3],"sleep":[77,50,1],"sing":[41,68,1],"carrot":[50,64,5],"back":[41,70,0],"peek":[26,75,0]},"strawberry":{"front":[48,75,0],"walk0":[53,70,0],"walk1":[53,68,1],"walk2":[51,69,0],"walk3":[53,70,2],"jump":[57,59,2],"sit":[57,69,3],"sleep":[77,53,3],"sing":[43,68,1],"carrot":[42,62,3],"back":[41,70,0],"peek":[26,75,0]},"gardener":{"front":[48,75,0],"walk0":[53,69,-1],"walk1":[53,66,-1],"walk2":[51,69,0],"walk3":[51,67,-1],"jump":[51,55,-2],"sit":[55,66,0],"back":[41,70,0],"sleep":[77,50,0],"peek":[26,75,0],"sing":[39,67,0],"carrot":[40,58,-1]}};
+const OUTFITS = [['classic', 'Klasik', 'Her zamanki tavşanımız'], ['gingham', 'Kırmızı Kareli Elbise', 'Piknik havası'], ['night', 'Gece Elbisesi', 'Yıldızlı gece'], ['princess', 'Prenses Elbisesi', 'Pembe prenses'], ['strawberry', 'Çilek Elbisesi', 'Tatlı çilekler'], ['gardener', 'Papatyalı Bahçıvan', 'Yeşil bahçıvan tulumu']];
+const curOutfit = () => (bunny && OUT[bunny.outfit]) ? bunny.outfit : 'classic';
+const bodyKey = (o, n) => (o !== 'classic' && OUT[o] && OUT[o][n]) ? o : 'classic';
+const bodyUrl = (o, n) => bodyKey(o, n) === 'classic' ? sprUrl(n) : `bunny/o_${o}/${n}.png`;
 const FLIPS = new Set(['walk0', 'walk1', 'walk2', 'walk3', 'jump', 'sit', 'peek']); /* sağa bakan çizimler */
 const POSE = { sit: 'sit', front: 'front', back: 'back', sing: 'sing', eat: 'carrot', peek: 'peek', sleep: 'sleep', munch: 'sit' };
 const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1002,7 +1021,11 @@ const curVal = k => !bunny ? 70 : Math.max(0, Math.min(100, (bunny[k] == null ? 
 const isSleeping = () => !!bunny && !!bunny.sleeping && curVal('energy') < 100;
 const FOODS = { carrot: ['Havuç', 'carrot_item', '🥕', 30], lettuce: ['Marul', 'food_lettuce', '🥬', 22], apple: ['Elma', 'food_apple', '🍎', 25], broccoli: ['Brokoli', 'food_broccoli', '🥦', 22], cucumber: ['Salatalık', 'food_cucumber', '🥒', 18], hay: ['Kuru ot', 'food_hay', '🌾', 15], strawberry: ['Çilek', 'food_strawberry', '🍓', 8] };
 const BED_LIFT = 22;
-function setBunny(b) { bunny = { ...b, at: Date.now() }; paintBunny(); syncPetLayer(); }
+function preloadBunny() {
+  Object.keys(SPR).forEach(n => { const i = new Image(); i.src = sprUrl(n); });
+  const o = curOutfit(); if (o !== 'classic') Object.keys(OUT[o]).forEach(n => { const i = new Image(); i.src = bodyUrl(o, n); });
+}
+function setBunny(b) { const was = curOutfit(); bunny = { ...b, at: Date.now() }; if (curOutfit() !== was) preloadBunny(); paintBunny(); syncPetLayer(); }
 async function refreshBunny() { if (!code || !role) return; try { setBunny((await bapi('get')).bunny); } catch (e) {} }
 const bName = () => (bunny && bunny.name) || 'Tavşanımız';
 const isNight = () => { const h = new Date().getHours(); return h >= 23 || h < 7; };
@@ -1072,10 +1095,14 @@ class Pet {
   maxY() { return Math.max(this.minY() + 40, this.H() - 92); }
   hw() { return SPR[this.cur][0] * this.s / 2; }
   pose(n) {
-    if (this.cur === n && this.img.getAttribute('src')) return;
-    this.cur = n; this.img.src = sprUrl(n);
-    const [w, h] = SPR[n];
-    this.img.style.width = w * this.s + 'px'; this.img.style.height = h * this.s + 'px'; this.el.style.width = w * this.s + 'px';
+    const o = curOutfit(), k = bodyKey(o, n);
+    if (this.cur === n && this.ok === k && this.img.getAttribute('src')) return;
+    this.cur = n; this.ok = k; this.img.src = bodyUrl(o, n);
+    const [w, h] = SPR[n], t = k === 'classic' ? null : OUT[k][n];
+    /* kutu her zaman orijinal ölçüde kalır (dokunma alanı, baloncuk, gölge aynı); elbise aynı kafa hizasında üstüne çizilir */
+    this.el.style.width = w * this.s + 'px'; this.el.style.height = h * this.s + 'px';
+    const iw = t ? t[0] : w, ih = t ? t[1] : h, dr = t ? t[2] : 0;
+    Object.assign(this.img.style, { position: 'absolute', left: '50%', bottom: -dr * this.s + 'px', width: iw * this.s + 'px', height: ih * this.s + 'px', marginLeft: -iw * this.s / 2 + 'px' });
   }
   set(mode, dur) {
     if (this.hold && mode !== 'hold') { this.hold.remove(); this.hold = null; }
@@ -1356,7 +1383,7 @@ function syncPetLayer() {
   const show = view !== 'bunny' && !isSleeping();
   if (!petLayer && show) {
     petLayer = el('div', { id: 'pet-layer' }); document.body.append(petLayer);
-    Object.keys(SPR).forEach(n => { const i = new Image(); i.src = sprUrl(n); });
+    preloadBunny();
     new Pet(petLayer, { s: 1, free: true, speed: 40, peek: true, onTap: layerTap, onStroke: strokeBunny, mood: bunnyMood, onIdle: layerIdle });
   }
   if (petLayer) { petLayer.hidden = !show; if (show) startPets(); }
@@ -1462,7 +1489,8 @@ function bunnyView() {
   const nameSlot = el('div');
   const host = el('div', { class: 'stage-host' });
   const bed = el('img', { class: 'bed', src: sprUrl('bed'), alt: '' });
-  const stage = el('div', { class: 'stage' + (isNight() ? ' night' : '') }, el('div', { class: 'stage-sky' }), el('div', { class: 'stage-ground' }), bed, host);
+  const wardrobe = el('button', { class: 'wardrobe', type: 'button', 'aria-label': 'Gardırop' }, el('img', { src: sprUrl('wardrobe'), alt: '' }));
+  const stage = el('div', { class: 'stage' + (isNight() ? ' night' : '') }, el('div', { class: 'stage-sky' }), el('div', { class: 'stage-ground' }), bed, wardrobe, host);
   const face = el('img', { class: 'bface', alt: '' }), say = el('div', { class: 'bsay' });
   const mkBar = (label, cls) => { const fill = el('div', { class: 'fill ' + cls }), val = el('b'); return { fill, val, node: el('div', { class: 'bar' }, el('div', { class: 'bl' }, el('span', {}, label), val), el('div', { class: 'track' }, fill)) }; };
   const bf = mkBar('Karnı', 'carrot'), bl = mkBar('Sevgisi', 'love'), be = mkBar('Enerjisi', 'zz');
@@ -1492,6 +1520,22 @@ function bunnyView() {
       el('img', { src: sprUrl(f[1]), alt: '' }), f[0], el('small', {}, `Tokluk +${f[3]}`))));
     close = openSheet('Ne yedirelim?', grid);
   };
+  wardrobe.onclick = () => {
+    let close;
+    const cur = curOutfit();
+    const grid = el('div', { class: 'wd-grid' }, ...OUTFITS.map(([id, name, sub]) => el('button', { class: 'wd-item', type: 'button', 'aria-pressed': String(id === cur), onclick: async () => {
+      if (id === curOutfit()) { close(); return; }
+      close();
+      try {
+        setBunny((await bapi('outfit', { id })).bunny);
+        const p = me.pet;
+        if (p) { p.lift = 0; p.set('dance', 2.4); p.burst(6); p.say(id === 'classic' ? 'Yine ben! 🐰' : 'Yeni kıyafetim çok güzel! ✨', 3000); p.img.classList.remove('dressed'); void p.img.offsetWidth; p.img.classList.add('dressed'); }
+        note(id === 'classic' ? 'Klasik haline döndü 🐰' : `${name} giydirildi ✨`);
+      } catch (e) { note('Şu an ulaşılamadı, biraz sonra tekrar dene.', true); }
+    } },
+      el('span', { class: 'wd-pic' }, el('img', { src: bodyUrl(id, 'front'), alt: '' })), name, el('small', {}, sub))));
+    close = openSheet('Gardırop 👗', grid);
+  };
   const putToBed = async (fromDrag) => {
     const p = me.pet;
     try {
@@ -1517,7 +1561,7 @@ function bunnyView() {
   };
   box.append(head, nameSlot, stage, card, el('div', { class: 'bbtns' }, feed, love, sleepBtn), st, kiss, info, counts,
     el('div', { class: 'row' }, el('button', { class: 'chip', type: 'button', onclick: renameSheet }, 'Adını değiştir')),
-    el('p', { class: 'muted', style: 'margin:0' }, 'Parmağını üzerinde gezdirerek sevebilir, basılı tutup yatağına sürükleyerek uyutabilirsin ♥ Karnı, sevgisi ve enerjisi zamanla azalır; acıkınca, sevgi isteyince ya da uykusu gelince ikimize de bildirim gider.'));
+    el('p', { class: 'muted', style: 'margin:0' }, 'Parmağını üzerinde gezdirerek sevebilir, basılı tutup yatağına sürükleyerek uyutabilirsin, gardıroptan kıyafet seçebilirsin ♥ Karnı, sevgisi ve enerjisi zamanla azalır; acıkınca, sevgi isteyince ya da uykusu gelince ikimize de bildirim gider.'));
   if (!bunny) refreshBunny();
   const timer = setInterval(() => { if (!box.isConnected) clearInterval(timer); else paintBunny(); }, 30000);
   queueMicrotask(() => { paintBunny(); if (host.isConnected) me.pet = new Pet(host, { s: 2, onTap: stageTap, bed: () => bed.offsetLeft + bed.offsetWidth / 2,
