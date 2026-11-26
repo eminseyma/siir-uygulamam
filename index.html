@@ -292,7 +292,7 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
     const fs = Math.min(W * 0.52, H * 0.3, 240);
     o.font = `700 ${fs}px Quicksand, system-ui, sans-serif`; o.textAlign = 'center'; o.textBaseline = 'alphabetic';
     const wE = o.measureText('E').width, wS = o.measureText('Ş').width, gap = fs * 0.52;
-    const total = wE + wS + gap, x0 = W / 2 - total / 2, base = H * 0.6 + fs * 0.36;
+    const total = wE + wS + gap, x0 = W / 2 - total / 2, base = H * 0.74 + fs * 0.36;
     o.fillStyle = '#000'; o.fillText('E', x0 + wE / 2, base); o.fillText('Ş', x0 + wE + gap + wS / 2, base);
     const data = o.getImageData(0, 0, W, H).data;
     let step = Math.max(8, Math.round(fs / 20)), pts = [];
