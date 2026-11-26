@@ -1144,8 +1144,8 @@ class Pet {
     if (this.onIdle) this.onIdle(this, mood);
     const sad = mood === 'hungry' || mood === 'sulk' || mood === 'sleepy';
     const tab = sad
-      ? [['walk', .35], ['sit', .2], ['back', .2], ['hold', .04]]
-      : [['walk', .34], ['sit', .08], ['front', .06], ['back', .1], ['hold', .03], ['jump', .07], ['sing', .06], ['dance', .07], ['sparkle', .05], ['peek', .03]];
+      ? [['walk', .35], ['sit', .2], ['back', .2], ['hold', .2]]
+      : [['walk', .34], ['sit', .08], ['front', .06], ['back', .1], ['hold', .12], ['jump', .07], ['sing', .06], ['dance', .07], ['sparkle', .05], ['peek', .03]];
     let acc = 0, k = 'sit'; const tot = tab.reduce((a, t) => a + t[1], 0) * r;
     for (const [n, w] of tab) { acc += w; if (tot <= acc) { k = n; break; } }
     switch (k) {
