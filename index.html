@@ -1134,7 +1134,7 @@ class Pet {
   }
   next() {
     const mood = this.mood(), W = this.W(), r = Math.random();
-    if (REDUCE) return this.set(mood === 'sleep' ? 'sleep' : 'sit', 20);
+    if (REDUCE) return this.set(mood === 'sleep' ? 'sleep' : 'front', 20);
     if (mood === 'sleep') {
       const bx = this.bedFn && this.bedFn();
       if (bx != null && Math.abs(this.x - bx) > 6 && Date.now() - this.born > 4000) { this.lift = 0; return this.goto(bx, this.y); }
@@ -1146,21 +1146,21 @@ class Pet {
     if (this.onIdle) this.onIdle(this, mood);
     const sad = mood === 'hungry' || mood === 'sulk' || mood === 'sleepy';
     const tab = sad
-      ? [['walk', .25], ['sit', .3], ['back', .25], ['hold', .2]]
-      : [['walk', .28], ['sit', .14], ['front', .08], ['back', .1], ['hold', .12], ['jump', .07], ['sing', .06], ['dance', .07], ['sparkle', .05], ['peek', .03]];
+      ? [['walk', .35], ['sit', .2], ['back', .2], ['hold', .25]]
+      : [['walk', .34], ['sit', .08], ['front', .06], ['back', .1], ['hold', .12], ['jump', .07], ['sing', .06], ['dance', .07], ['sparkle', .05], ['peek', .03]];
     let acc = 0, k = 'sit'; const tot = tab.reduce((a, t) => a + t[1], 0) * r;
     for (const [n, w] of tab) { acc += w; if (tot <= acc) { k = n; break; } }
     switch (k) {
       case 'walk': return this.goto(...this.target());
-      case 'sit': return this.set('sit', rnd(2.5, 5));
-      case 'front': return this.set('front', rnd(2, 4));
+      case 'sit': return this.set('front', rnd(1.4, 2.6));
+      case 'front': return this.set('front', rnd(1.6, 3));
       case 'back': return this.set('back', rnd(3, 5));
       case 'hold': return this.set('hold', rnd(5, 8));
       case 'jump': this.dir = Math.random() < .5 ? -1 : 1; this.jn = Math.floor(rnd(0, 3)); return this.set('jump', .7);
       case 'sing': return this.set('sing', rnd(2.5, 4));
-      case 'dance': return mood === 'happy' || mood === 'ok' ? this.set('dance', rnd(2.2, 3.4)) : this.set('sit', 3);
-      case 'sparkle': this.set('sit', rnd(2, 3)); for (let i = 0; i < 3; i++) setTimeout(() => this.fly('s'), i * 300); return;
-      case 'peek': if (this.peekOK) return this.goto(Math.random() < .5 ? 0 : W, this.free ? rnd(this.minY(), this.maxY()) : this.y, 'peek'); return this.set('sit', 3);
+      case 'dance': return mood === 'happy' || mood === 'ok' ? this.set('dance', rnd(2.2, 3.4)) : this.set('front', 2);
+      case 'sparkle': this.set('front', rnd(2, 3)); for (let i = 0; i < 3; i++) setTimeout(() => this.fly('s'), i * 300); return;
+      case 'peek': if (this.peekOK) return this.goto(Math.random() < .5 ? 0 : W, this.free ? rnd(this.minY(), this.maxY()) : this.y, 'peek'); return this.set('front', 2);
     }
   }
   update(dt) {
