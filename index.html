@@ -207,6 +207,19 @@ hr{border:0;border-top:1.5px dashed var(--line);width:100%;margin:6px 0}
 .wardrobe:hover,.wardrobe:focus-visible{transform:translateY(-2px);filter:drop-shadow(0 0 8px var(--lav))}
 .wardrobe:focus-visible{outline:none}
 .wd-tag{position:absolute;left:50%;top:-6px;transform:translate(-50%,-100%);font-size:.7rem;font-weight:800;color:var(--rose-deep);background:var(--surface-solid);border:1.5px solid var(--line);border-radius:10px;padding:1px 7px;white-space:nowrap;pointer-events:none}
+.cgame{display:block;margin:6px auto 10px;border-radius:18px;border:1.5px solid var(--line);touch-action:none;background:#cfe8ff}
+.cginfo{text-align:center;color:var(--muted);font-weight:600;font-size:.88rem;margin:0 0 12px;line-height:1.4}
+.pet-xp[hidden],.pet-umb[hidden]{display:none!important}
+.pet-xp{position:absolute;display:block;image-rendering:pixelated;pointer-events:none;transform-origin:50% 100%}
+.pet-umb{position:absolute;left:50%;bottom:100%;image-rendering:pixelated;pointer-events:none;margin-bottom:-3px;animation:umbbob 2.4s ease-in-out infinite}
+@keyframes umbbob{50%{transform:translateY(-2px) rotate(2deg)}}
+#wx-layer{position:fixed;inset:0;z-index:4;pointer-events:none;overflow:hidden}
+#wx-layer i{position:absolute;top:-24px;display:block;will-change:transform}
+#wx-layer.rain i{width:2px;height:12px;background:linear-gradient(180deg,rgba(150,190,255,0),rgba(150,190,255,.7));animation:wxrain linear infinite}
+#wx-layer.snow i{width:5px;height:5px;background:#fff;opacity:.85;box-shadow:0 0 4px rgba(255,255,255,.7);animation:wxsnow linear infinite}
+@keyframes wxrain{to{transform:translate3d(-30px,110vh,0)}}
+@keyframes wxsnow{0%{transform:translate3d(0,0,0)}50%{transform:translate3d(24px,55vh,0)}100%{transform:translate3d(-8px,110vh,0)}}
+@media (prefers-reduced-motion:reduce){#wx-layer i,.pet-umb{animation:none}}
 .pet img.dressed{animation:dressup .8s ease-out}
 @keyframes dressup{0%{filter:brightness(1.35) drop-shadow(0 0 8px #fff)}60%{filter:brightness(1.12) drop-shadow(0 0 5px #fff)}100%{filter:none}}
 .wd-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 4px}
@@ -1064,6 +1077,7 @@ const sayFor = mood => {
 };
 
 /* ---- Gezinen tavşan ---- */
+const XPOSE = new Set(['front', 'walk0', 'walk1', 'walk2', 'walk3', 'jump', 'sit']);
 const pets = new Set(); let petRaf = 0, petLast = 0, petAcc = 0;
 class Pet {
   constructor(host, o) {
@@ -1076,7 +1090,11 @@ class Pet {
     this.img = el('img', { alt: '', draggable: 'false' });
     this.fx = el('div', { class: 'pet-fx' });
     this.bub = el('div', { class: 'pet-bub', hidden: true });
-    this.el.append(this.sh, this.img, this.fx, this.bub);
+    this.umb = el('img', { class: 'pet-umb', src: sprUrl('umbrella'), alt: '', hidden: true });
+    this.umb.style.width = 32 * this.s + 'px'; this.umb.style.marginLeft = -16 * this.s + 'px'; this.umb.style.marginBottom = -10 * this.s + 'px';
+    /* yüz ifadesi katmanı: aç/üzgün (gözyaşı), sinirli (kaş), uykulu (göz kapağı) — sadece gözlerin üstüne çizilir, tavşanın kendisi değişmez */
+    this.xp = el('img', { class: 'pet-xp', alt: '', hidden: true }); this.xp.style.left = '0'; this.xp.style.top = '0';
+    this.el.append(this.sh, this.umb, this.img, this.xp, this.fx, this.bub);
     this.el.addEventListener('pointerdown', e => this.pDown(e));
     this.el.addEventListener('pointermove', e => this.pMove(e));
     this.el.addEventListener('pointerup', e => this.pUp(e, false));
@@ -1199,6 +1217,16 @@ class Pet {
     const f = FLIPS.has(this.cur) && this.dir < 0 ? -1 : 1;
     this.img.style.transform = `translateY(${(-this.jy - this.lift).toFixed(1)}px) scaleX(${f})`;
     this.sh.style.display = this.lift > 1 ? 'none' : '';
+    const mo = this.mood(), xk = XPOSE.has(this.cur) && (mo === 'hungry' || mo === 'sulk' || mo === 'sleepy') ? mo : '';
+    if (xk !== this.xk || this.cur !== this.xc) {
+      this.xk = xk; this.xc = this.cur;
+      if (xk) { const [w, h] = SPR[this.cur]; this.xp.src = `bunny/x_${xk}/${this.cur}.png`; this.xp.style.width = w * this.s + 'px'; this.xp.style.height = h * this.s + 'px'; }
+      this.xp.hidden = !xk;
+    }
+    if (xk) this.xp.style.transform = this.img.style.transform;
+    const um = WX.kind === 'rain' && this.mode !== 'sleep' && this.mode !== 'held';
+    if (um === this.umb.hidden) this.umb.hidden = !um;
+    if (um) this.umb.style.top = 'auto', this.umb.style.translate = `0 ${(-this.jy - this.lift).toFixed(1)}px`;
   }
   /* parmakla okşama: tavşanın üzerinde parmağı gezdirince kalp çıkar, sevgi artar */
   pDown(e) {
@@ -1387,6 +1415,88 @@ function syncPetLayer() {
   if (petLayer) { petLayer.hidden = !show; if (show) startPets(); }
 }
 
+/* ---- Hava durumu: yağmurda şemsiye, karda kar (Open-Meteo, anahtarsız) ---- */
+const WX = { kind: 'clear', at: 0 };
+const wxKind = c => (c >= 71 && c <= 77) || c === 85 || c === 86 ? 'snow' : ((c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95) ? 'rain' : 'clear';
+function wxPaint() {
+  let L = document.getElementById('wx-layer');
+  if (WX.kind === 'clear') { if (L) L.remove(); return; }
+  if (!L) { L = el('div', { id: 'wx-layer', 'aria-hidden': 'true' }); document.body.append(L); }
+  if (L.className === WX.kind) return;
+  L.className = WX.kind; L.replaceChildren();
+  const n = WX.kind === 'rain' ? 34 : 30;
+  for (let i = 0; i < n; i++) { const d = document.createElement('i');
+    d.style.left = (Math.random() * 110 - 5) + '%'; d.style.animationDuration = (WX.kind === 'rain' ? .8 + Math.random() * .6 : 5 + Math.random() * 5) + 's';
+    d.style.animationDelay = -Math.random() * 8 + 's'; if (WX.kind === 'snow') { const z = 3 + Math.random() * 4; d.style.width = d.style.height = z + 'px'; }
+    L.append(d); }
+}
+function wxSet(kind) {
+  const was = WX.kind; WX.kind = kind; wxPaint();
+  if (kind !== was) { pets.forEach(p => { if (kind === 'rain') p.say('Yağmur yağıyor! ☔', 3000); else if (kind === 'snow') p.say('Kar yağıyor! ⛄', 3000); }); }
+}
+async function wxRefresh(ask) {
+  try {
+    const t = new URLSearchParams(location.search).get('wx'); if (t) { wxSet(t); return; }
+    if (Date.now() - WX.at < 15 * 60 * 1000) return;
+    let g = null; try { g = JSON.parse(store.get('geo') || 'null'); } catch (e) {}
+    if (!g && ask && navigator.geolocation && !store.get('geo_asked')) {
+      store.set('geo_asked', '1');
+      g = await new Promise(r => navigator.geolocation.getCurrentPosition(p => r({ la: +p.coords.latitude.toFixed(2), lo: +p.coords.longitude.toFixed(2) }), () => r(null), { timeout: 12000, maximumAge: 6e5 }));
+      if (g) store.set('geo', JSON.stringify(g));
+    }
+    if (!g) return;
+    WX.at = Date.now();
+    const j = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${g.la}&longitude=${g.lo}&current=weather_code`)).json();
+    wxSet(wxKind(Number(j && j.current && j.current.weather_code)));
+  } catch (e) { WX.at = Date.now() - 10 * 60 * 1000; }
+}
+setInterval(() => { if (!document.hidden && code) wxRefresh(false); }, 5 * 60 * 1000);
+
+/* ---- Havuç toplama oyunu: 30 sn, her 5 havuç = 1 öpücük borcu (borç ARTAR) ---- */
+function carrotGame(done) {
+  const o = curOutfit(), DUR = 30;
+  const imgs = {}; const ld = n => { if (!imgs[n]) { const i = new Image(); i.src = bodyUrl(o, n); imgs[n] = i; } return imgs[n]; };
+  const carrotImg = new Image(); carrotImg.src = sprUrl('carrot_item');
+  const cv = el('canvas', { class: 'cgame' }); const info = el('div', { class: 'cginfo' }, 'Tavşanı parmağınla sağa sola kaydır, havuçları yakala! 30 saniyen var.');
+  const go = el('button', { class: 'btn', type: 'button' }, 'Başla');
+  let close = openSheet('Havuç toplama 🥕', cv, info, go), raf = 0, running = false;
+  const sheet = cv.closest('.sheet');
+  const W = Math.min(340, (sheet ? sheet.clientWidth : 340) - 40), H = 380; const d = Math.min(devicePixelRatio || 1, 2);
+  cv.width = W * d; cv.height = H * d; cv.style.width = W + 'px'; cv.style.height = H + 'px'; const c = cv.getContext('2d'); c.scale(d, d); c.imageSmoothingEnabled = false;
+  const SC = 1.3, bw = SPR.walk0[0] * SC, bh = SPR.walk0[1] * SC;
+  let bx = W / 2, tx = W / 2, dir = 1, score = 0, t = 0, spawn = 0, items = [], fr = 0, last = 0, pops = [];
+  const move = e => { const r = cv.getBoundingClientRect(); tx = Math.max(bw / 2, Math.min(W - bw / 2, e.clientX - r.left)); };
+  cv.addEventListener('pointerdown', move); cv.addEventListener('pointermove', move);
+  const draw = () => {
+    const g = c.createLinearGradient(0, 0, 0, H); const night = isNight();
+    g.addColorStop(0, night ? '#2a2145' : '#cfe8ff'); g.addColorStop(1, night ? '#1b1530' : '#f3e9ff'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.fillStyle = night ? '#2f4a45' : '#9fd49a'; c.fillRect(0, H - 34, W, 34);
+    for (const it of items) { const w = 24 * 1.4, h = 33 * 1.4; c.save(); c.translate(it.x, it.y); c.rotate(it.r); c.drawImage(carrotImg, -w / 2, -h / 2, w, h); c.restore(); }
+    const n = running && Math.abs(tx - bx) > 2 ? 'walk' + (fr % 4) : 'front'; const im = ld(n === 'front' ? 'front' : n); const [sw, sh] = SPR[n];
+    c.save(); c.translate(bx, H - 30); if (n !== 'front' && dir < 0) c.scale(-1, 1);
+    const ot = OUT[o] && OUT[o][n], iw = (ot ? ot[0] : sw) * SC, ih = (ot ? ot[1] : sh) * SC, dr = (ot ? ot[2] : 0) * SC;
+    if (im.complete) c.drawImage(im, -iw / 2, -ih + dr, iw, ih); c.restore();
+    for (const p of pops) { c.globalAlpha = Math.max(0, p.l); c.fillStyle = '#ee5f86'; c.font = '700 16px Quicksand,system-ui'; c.fillText('+1', p.x, p.y); c.globalAlpha = 1; }
+    c.fillStyle = night ? '#fff' : '#7a3a55'; c.font = '700 16px Quicksand,system-ui'; c.textAlign = 'left'; c.fillText('🥕 ' + score, 12, 24); c.textAlign = 'right'; c.fillText(Math.max(0, Math.ceil(DUR - t)) + ' sn', W - 12, 24);
+  };
+  const step = ts => {
+    const dt = Math.min((ts - last) / 1000 || 0, .05); last = ts; t += dt; fr = Math.floor(t * 10);
+    const dx = tx - bx; if (Math.abs(dx) > 1) { dir = dx > 0 ? 1 : -1; bx += Math.sign(dx) * Math.min(Math.abs(dx), 330 * dt); }
+    spawn -= dt; if (spawn <= 0) { spawn = Math.max(.38, .85 - t * .016); items.push({ x: 16 + Math.random() * (W - 32), y: -20, v: 120 + t * 4.5 + Math.random() * 40, r: (Math.random() - .5) * .8 }); }
+    for (const it of items) { it.y += it.v * dt; it.r += dt * .5; }
+    items = items.filter(it => { if (it.y > H - 30 - bh * .75 && it.y < H - 20 && Math.abs(it.x - bx) < bw * .45) { score++; pops.push({ x: it.x, y: it.y, l: 1 }); return false; } return it.y < H + 20; });
+    pops.forEach(p => { p.y -= 30 * dt; p.l -= dt * 1.6; }); pops = pops.filter(p => p.l > 0);
+    draw();
+    if (t >= DUR) { running = false; finish(); return; }
+    raf = requestAnimationFrame(step);
+  };
+  const finish = () => { const k = Math.min(8, Math.floor(score / 5));
+    info.textContent = `Süre doldu! ${score} havuç 🥕 → ${k} öpücük borcu 💋 (her 5 havuç 1 öpücük, en fazla 8)`; go.textContent = 'Kaydet ve kapat'; go.disabled = false; go.onclick = () => { go.disabled = true; close(); done(score); }; };
+  go.onclick = () => { go.disabled = true; go.textContent = 'Oynuyor…'; info.textContent = 'Havuçları yakala!'; running = true; last = performance.now(); raf = requestAnimationFrame(step); };
+  draw();
+  const ov = cv.closest('.overlay'); if (ov) new MutationObserver(() => { if (!document.body.contains(ov)) { cancelAnimationFrame(raf); running = false; } }).observe(document.body, { childList: true });
+}
+
 /* ---- Tavşan sayfası ---- */
 function stageTap(p) {
   const mood = bunnyMood();
@@ -1482,6 +1592,7 @@ function rateSheet() {
 }
 
 function bunnyView() {
+  wxRefresh(true);
   const box = el('div', { class: 'panel' });
   const head = header(bName(), 'Bizim minik bebeğimiz ♥');
   const nameSlot = el('div');
@@ -1498,6 +1609,7 @@ function bunnyView() {
   const feed = el('button', { class: 'btn', type: 'button' }, el('img', { src: sprUrl('carrot_item'), alt: '' }), 'Yemek ver');
   const sleepBtn = el('button', { class: 'btn ghost', type: 'button' }, '😴 Yatır');
   const kiss = el('div', { class: 'kbank' });
+  const gameBtn = el('button', { class: 'btn ghost', type: 'button' }, '🥕 Havuç topla');
   const love = el('button', { class: 'btn ghost', type: 'button' }, '♥ Sev');
   const info = el('div', { class: 'notice binfo' }), counts = el('div', { class: 'stats' });
   const me = bui = { root: box, title: head.querySelector('h1'), face, say, fF: bf.fill, fL: bl.fill, fE: be.fill, vF: bf.val, vL: bl.val, vE: be.val, sleepBtn, kiss, info, counts, nameSlot, pet: null, mood: '' };
@@ -1534,6 +1646,16 @@ function bunnyView() {
       el('span', { class: 'wd-pic' }, el('img', { src: bodyUrl(id, 'front'), alt: '' })), name, el('small', {}, sub))));
     close = openSheet('Gardırop 👗', grid);
   };
+  gameBtn.onclick = () => {
+    if (isSleeping()) { note('Uyuyor, uyandırmayalım 😴'); return; }
+    carrotGame(async score => {
+      try {
+        const r = await bapi('game', { score }); setBunny(r.bunny);
+        const p = me.pet; if (p) { p.lift = 0; p.set('dance', 2.4); p.burst(6); p.say(score >= 5 ? 'Çok güzel toplamışsın! 🥕' : 'Bir daha oynayalım mı? 🐰', 3000); }
+        note(r.kisses ? `${score} havuç topladın! Borcuna +${r.kisses} öpücük yazıldı 💋 (buluşunca ödersin 😘)` : `${score} havuç topladın. Her 5 havuç 1 öpücük 💋`);
+      } catch (e) { note('Şu an ulaşılamadı, biraz sonra tekrar dene.', true); }
+    });
+  };
   const putToBed = async (fromDrag) => {
     const p = me.pet;
     try {
@@ -1557,7 +1679,7 @@ function bunnyView() {
     const r = await petIt(8500);
     if (r === null) note('Şu an ulaşılamadı, biraz sonra tekrar dene.', true); else note('');
   };
-  box.append(head, nameSlot, stage, card, el('div', { class: 'bbtns' }, feed, love, sleepBtn), st, kiss, info, counts,
+  box.append(head, nameSlot, stage, card, el('div', { class: 'bbtns' }, feed, love, sleepBtn, gameBtn), st, kiss, info, counts,
     el('div', { class: 'row' }, el('button', { class: 'chip', type: 'button', onclick: renameSheet }, 'Adını değiştir')),
     el('p', { class: 'muted', style: 'margin:0' }, 'Yedirdiğin her yemek öpücük borcuna yazılır 💋 Parmağını üzerinde gezdirerek sevebilir, basılı tutup yatağına sürükleyerek uyutabilirsin, gardıroptan kıyafet seçebilirsin ♥ Karnı, sevgisi ve enerjisi zamanla azalır; acıkınca, sevgi isteyince ya da uykusu gelince ikimize de bildirim gider.'));
   if (!bunny) refreshBunny();
